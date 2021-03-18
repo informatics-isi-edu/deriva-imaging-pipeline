@@ -1,5 +1,14 @@
 #!/usr/bin/python3
 
+"""
+Script for updating the model on Facebase.
+
+Usage:
+
+    python3 schema_updates.py <hostname> <catalog_number> <credentials_file>
+
+"""
+
 import argparse
 import json
 import sys
@@ -105,7 +114,8 @@ def add_rows_to_vocab_processing_status(catalog):
         {'Name': 'CONVERT ERROR', 'Description': 'An error occurred during the image conversion.'},
         {'Name': 'HTTP ERROR', 'Description': 'An HTTP error occurred.'},
         {'Name': 'GET THUMBNAIL ERROR', 'Description': 'The thumbnail image could not be retrieved from the image server.'},
-        {'Name': 'GET TIFF URL ERROR', 'Description': 'The TIFF image could not be retrieved from the image server.'}
+        {'Name': 'GET TIFF URL ERROR', 'Description': 'The TIFF image could not be retrieved from the image server.'},
+        {'Name': 'MISSING_SCENES_WARNING', 'Description': 'The TIFF image has no real scenes.'}
     ]
     pb = catalog.getPathBuilder()
     schema = pb.vocab
