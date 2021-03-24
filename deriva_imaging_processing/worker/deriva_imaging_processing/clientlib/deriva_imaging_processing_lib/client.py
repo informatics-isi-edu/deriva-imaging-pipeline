@@ -59,7 +59,7 @@ uuid = b'urn:uuid:'
 endTokens = [b'"', b'<']   
 ISI_NETWORK = '128.9' 
 
-class BioformatsClient (object):
+class DerivaImagingClient (object):
     """Network client for generating tiled pyramid images.
     """
 

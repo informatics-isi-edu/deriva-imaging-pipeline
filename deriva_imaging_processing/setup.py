@@ -7,11 +7,11 @@
 from distutils.core import setup
 
 setup(
-    name="IIIF IMAGE PROCESSING",
-    description="IIIF BIOFORMATS IMAGE PROCESSING",
+    name="deriva_imaging_processing",
+    description="deriva-imaging-processing",
     version="0.1-prerelease",
     scripts=[
-        "bin/bioformats_processing_worker"
+        "bin/deriva_imaging_processing_worker"
     ],
     requires=['os',
         'sys',

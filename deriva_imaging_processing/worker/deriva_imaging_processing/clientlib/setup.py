@@ -16,10 +16,10 @@
 
 from distutils.core import setup
 
-setup(name='bioformats_processing_lib',
-      description='library for generating bioformats images',
+setup(name='deriva_imaging_processing_lib',
+      description='library for generating images',
       version='0.1',
-      packages=['bioformats_processing_lib'],
+      packages=['deriva_imaging_processing_lib'],
       requires=["lxml"],
       classifiers=[
         'Intended Audience :: Developers',

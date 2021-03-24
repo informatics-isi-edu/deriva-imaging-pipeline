@@ -7,13 +7,13 @@
 from distutils.core import setup
 
 setup(
-    name="bioformats_processing_client",
+    name="deriva_imaging_processing_client",
     description="Script for generating images for OSD",
     version="0.1-prerelease",
     scripts=[
-        "bioformats_processing.py",
+        "deriva_imaging_processing.py",
     ],
-    requires=["bioformats_processing_lib"],
+    requires=["deriva_imaging_processing_lib"],
     maintainer_email="support@misd.isi.edu",
     license='(new) BSD',
     classifiers=[

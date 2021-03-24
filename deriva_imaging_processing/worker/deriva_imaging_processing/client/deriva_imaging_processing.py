@@ -27,7 +27,7 @@ import json
 import sys
 import traceback
 
-from bioformats_processing_lib import BioformatsClient
+from bioformats_processing_lib import DerivaImagingClient
 from deriva.core import init_logging
 
 FORMAT = '%(asctime)s: %(levelname)s <%(module)s>: %(message)s'
@@ -161,7 +161,7 @@ def load(config_filename):
 
     # Establish Ermrest client connection
     try:
-        client = BioformatsClient(baseuri=url, \
+        client = DerivaImagingClient(baseuri=url, \
                                version=version, \
                                cookie=cookie, \
                                data_scratch=data_scratch, \
