@@ -8,7 +8,7 @@ import logging
 import sys
 import traceback
 
-with open(os.getenv('BIOFORMATS_CONFIG'), 'r') as f:
+with open(os.getenv('DERIVA_IMAGING_CONFIG'), 'r') as f:
     config = json.load(f)
 
 # Loglevel dictionary
@@ -66,7 +66,7 @@ def tiff_row_job(handler):
         unit = handler.unit
         
         logger.info('Running job for generating a tiled pyramid for RID="%s" and Filename="%s".' % (row['RID'], row[config['original_file_name']])) 
-        args = ['env', 'host_server={}'.format(Worker.host_server),  'RID={}'.format(row['RID']), 'URL=https://{}/ermrest/catalog/{}'.format(Worker.servername, config['catalog_number']), '/usr/local/bin/bioformats_processing.py', '--config', '{}'.format(Worker.config_file)]
+        args = ['env', 'host_server={}'.format(Worker.host_server),  'RID={}'.format(row['RID']), 'URL=https://{}/ermrest/catalog/{}'.format(Worker.servername, config['catalog_number']), '/usr/local/bin/deriva_imaging_processing.py', '--config', '{}'.format(Worker.config_file)]
         p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         stdoutdata, stderrdata = p.communicate()
         returncode = p.returncode
@@ -95,7 +95,7 @@ _work_units.append(
 
 class Worker (object):
     # server to talk to... defaults to our own FQDN
-    servername = config['bioformat_server']
+    servername = config['deriva_imaging_server']
 
     # secret session cookie
     credfile = config['credentials_file']
@@ -103,8 +103,8 @@ class Worker (object):
     if 'cookie' not in credentials.keys():
     	credentials = credentials[servername]
 
-    poll_seconds = int(os.getenv('BIOFORMAT_POLL_SECONDS', '300'))
-    config_file = os.getenv('BIOFORMATS_CONFIG')
+    poll_seconds = int(os.getenv('DERIVA_IMAGING_POLL_SECONDS', '300'))
+    config_file = os.getenv('DERIVA_IMAGING_CONFIG')
 
     # the server which is processing the images can be different then the servername
     host_server = config['host_server']

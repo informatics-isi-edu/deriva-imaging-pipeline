@@ -27,7 +27,7 @@ import json
 import sys
 import traceback
 
-from bioformats_processing_lib import DerivaImagingClient
+from deriva_imaging_processing_lib import DerivaImagingClient
 from deriva.core import init_logging
 
 FORMAT = '%(asctime)s: %(levelname)s <%(module)s>: %(message)s'
@@ -70,21 +70,21 @@ def load(config_filename):
     url = os.getenv('URL', None)
     if url == None:
         logger.error('URL must be supplied through the "URL" environment variable.')
-        logger.error('Launch the script "env URL=https://foo.org/ermrest/catalog/N bioformats_processing.py --config <config-file>".')
+        logger.error('Launch the script "env URL=https://foo.org/ermrest/catalog/N deriva_imaging_processing.py --config <config-file>".')
         return None
         
     logger.info('URL: %s' % url)
     
-    bioformat_server = cfg.get('bioformat_server', None)
-    if bioformat_server == None:
-        logger.error('The bioformat server must be supplied.')
-        logger.error('Launch the script "env URL=https://foo.org/ermrest/catalog/N bioformats_processing.py --config <config-file>".')
+    deriva_imaging_server = cfg.get('deriva_imaging_server', None)
+    if deriva_imaging_server == None:
+        logger.error('The deriva_imaging server must be supplied.')
+        logger.error('Launch the script "env URL=https://foo.org/ermrest/catalog/N deriva_imaging_processing.py --config <config-file>".')
         return None
 
     credfile = cfg['credentials_file']
     cookie = json.load(open(credfile))
     if 'cookie' not in cookie.keys():
-        cookie = cookie[bioformat_server]['cookie']
+        cookie = cookie[deriva_imaging_server]['cookie']
 
     if not cookie:
         logger.error('Ermrest cookie must be provided.')
@@ -205,6 +205,6 @@ except:
     et, ev, tb = sys.exc_info()
     sys.stderr.write('got exception "%s"' % str(ev))
     sys.stderr.write('%s' % ''.join(traceback.format_exception(et, ev, tb)))
-    sys.stderr.write('\nusage: env URL=https://foo.org/ermrest/catalog/N bioformats_processing.py --config <config-file>\n\n')
+    sys.stderr.write('\nusage: env URL=https://foo.org/ermrest/catalog/N deriva_imaging_processing.py --config <config-file>\n\n')
     sys.exit(1)
 
