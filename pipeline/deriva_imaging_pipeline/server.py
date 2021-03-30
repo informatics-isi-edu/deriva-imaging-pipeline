@@ -5,24 +5,29 @@ import json
 from deriva.core import PollingErmrestCatalog, init_logging
 import subprocess
 import logging
+import socket
 import sys
 import traceback
+import argparse
+from .worker import DerivaImagingWorker
+from .client import get_configuration
 
-with open(os.getenv('DERIVA_IMAGING_CONFIG'), 'r') as f:
-    config = json.load(f)
 
 # Loglevel dictionary
-__LOGLEVEL = {'error': logging.ERROR,
-              'warning': logging.WARNING,
-              'info': logging.INFO,
-              'debug': logging.DEBUG}
+__LOGLEVEL = {
+    'critical': logging.FATAL,
+    'fatal': logging.CRITICAL,
+    'error': logging.ERROR,
+    'warning': logging.WARNING,
+    'info': logging.INFO,
+    'debug': logging.DEBUG
+}
 
 FORMAT = '%(asctime)s: %(levelname)s <%(module)s>: %(message)s'
 
 logger = logging.getLogger(__name__)
-loglevel = os.getenv('LOGLEVEL', 'info')
-loglevel =__LOGLEVEL.get(loglevel)
-init_logging(level=loglevel, log_format=FORMAT, file_path=config['log'])
+config = None
+deriva_worker_configuration = None
 
 class WorkerRuntimeError (RuntimeError):
     pass
@@ -66,10 +71,8 @@ def tiff_row_job(handler):
         unit = handler.unit
         
         logger.info('Running job for generating a tiled pyramid for RID="%s" and Filename="%s".' % (row['RID'], row[config['original_file_name']])) 
-        args = ['env', 'host_server={}'.format(Worker.host_server),  'RID={}'.format(row['RID']), 'URL=https://{}/ermrest/catalog/{}'.format(Worker.servername, config['catalog_number']), '/usr/local/bin/deriva_imaging_processing.py', '--config', '{}'.format(Worker.config_file)]
-        p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        stdoutdata, stderrdata = p.communicate()
-        returncode = p.returncode
+        deriva_imaging_worker = DerivaImagingWorker(deriva_worker_configuration)
+        returncode = deriva_imaging_worker.processImage(row['RID'])
     except:
         et, ev, tb = sys.exc_info()
         logger.error('got unexpected exception "%s"' % str(ev))
@@ -77,47 +80,13 @@ def tiff_row_job(handler):
         returncode = 1
         
     if returncode != 0:
-        logger.error('Could not execute the script for generating jpg image.\nstdoutdata: %s\nstderrdata: %s\n' % (stdoutdata, stderrdata)) 
-        raise WorkerRuntimeError('Could not execute the script for generating jpg image.\nstdoutdata: %s\nstderrdata: %s\n' % (stdoutdata, stderrdata))
+        logger.error('Could not execute the worker script') 
+        raise WorkerRuntimeError('Could not execute the worker script')
     else:
         logger.info('Finished job for generating jpg image for RID="%s" and Filename="%s".' % (row['RID'], row[config['original_file_name']])) 
                 
 
-_work_units.append(
-    WorkUnit(
-        config['get_claimable_url'],
-        config['put_claim_url'],
-        config['put_update_baseurl'],
-        image_row_job
-    )
-)
-
-
 class Worker (object):
-    # server to talk to... defaults to our own FQDN
-    servername = config['deriva_imaging_server']
-
-    # secret session cookie
-    credfile = config['credentials_file']
-    credentials = json.load(open(credfile))
-    if 'cookie' not in credentials.keys():
-    	credentials = credentials[servername]
-
-    poll_seconds = int(os.getenv('DERIVA_IMAGING_POLL_SECONDS', '300'))
-    config_file = os.getenv('DERIVA_IMAGING_CONFIG')
-
-    # the server which is processing the images can be different then the servername
-    host_server = config['host_server']
-    
-    # these are peristent/logical connections so we create once and reuse
-    # they can retain state and manage an actual HTTP connection-pool
-    catalog = PollingErmrestCatalog(
-        'https', 
-        servername,
-        config['catalog_number'],
-        credentials
-    )
-    catalog.dcctx['cid'] = 'pipeline/image/2D/tiff'
 
     def __init__(self, row, unit):
         logger.info('Claimed job %s.\n' % row.get('RID'))
@@ -178,5 +147,58 @@ class Worker (object):
     def blocking_poll(cls):
         return cls.catalog.blocking_poll(cls.look_for_work, polling_seconds=cls.poll_seconds)
 
-Worker.blocking_poll()
+def main():
+    global config, logger, deriva_worker_configuration, _work_units
+    
+    parser = argparse.ArgumentParser(description='Tool to process deriva images.')
+    parser.add_argument( '--config', action='store', type=str, help='The JSON configuration file.', required=True)
+    args = parser.parse_args()
+    with open(args.config, 'r') as f:
+        config = json.load(f)
+    loglevel = config.get('loglevel', None)
+    if loglevel:
+        loglevel = __LOGLEVEL.get(loglevel, None)
+    logfile = config.get('log', None)
+    if loglevel and logfile:
+        init_logging(level=loglevel, log_format=FORMAT, file_path=logfile)
+    else:
+        logging.getLogger().addHandler(logging.NullHandler())
+    deriva_worker_configuration = get_configuration(config, logger)
+    if deriva_worker_configuration == None:
+        return 1
+    _work_units.append(
+        WorkUnit(
+            config['get_claimable_url'],
+            config['put_claim_url'],
+            config['put_update_baseurl'],
+            image_row_job
+        )
+    )
+    
+    servername = config['deriva_imaging_server']
+
+    # secret session cookie
+    credfile = config['credentials_file']
+    credentials = json.load(open(credfile))
+    if 'cookie' not in credentials.keys():
+        credentials = credentials[servername]
+
+
+    # these are peristent/logical connections so we create once and reuse
+    # they can retain state and manage an actual HTTP connection-pool
+    catalog = PollingErmrestCatalog(
+        'https', 
+        servername,
+        config['catalog_number'],
+        credentials
+    )
+    catalog.dcctx['cid'] = 'pipeline/image/2D/tiff'
+    Worker.poll_seconds = int(os.getenv('DERIVA_IMAGING_POLL_SECONDS', '300'))
+    Worker.catalog = catalog
+    Worker.blocking_poll()
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())
 

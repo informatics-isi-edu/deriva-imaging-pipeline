@@ -16,16 +16,37 @@
 
 from distutils.core import setup
 
-setup(name='deriva_imaging_processing_lib',
-      description='library for generating images',
-      version='0.1',
-      packages=['deriva_imaging_processing_lib'],
-      requires=["lxml"],
-      classifiers=[
+url = "https://github.com/informatics-isi-edu/deriva-imaging-pipeline"
+author = 'USC Information Sciences Institute, Informatics Systems Research Division'
+author_email = 'isrd-support@isi.edu'
+
+setup(
+    name='deriva_imaging_pipeline',
+    description='Library for processing images',
+    version='0.1',
+    url=url,
+    author=author,
+    author_email=author_email,
+    maintainer=author,
+    maintainer_email=author_email,
+    entry_points={
+        'console_scripts': [
+            'deriva-imaging-server = deriva_imaging_pipeline.server:main',
+            'deriva-imaging-client = deriva_imaging_pipeline.client:main'
+        ]
+    },
+    packages=['deriva_imaging_pipeline'],
+    requires=['os',
+              'sys',
+              'lxml',
+              'deriva'
+              ],
+    license='Apache 2.0',
+    classifiers=[
         'Intended Audience :: Developers',
         'License :: OSI Approved :: Apache Software License',
         'Programming Language :: Python :: 3',
         'Topic :: Internet :: WWW/HTTP',
         'Topic :: Software Development :: Libraries :: Python Modules'
-        ]
-     )
+    ]
+)

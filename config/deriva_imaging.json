@@ -1,4 +1,5 @@
 {
+    "baseuri": "https://dev.facebase.org/ermrest/catalog/1",
     "python": "/usr/bin/python3",
     "extract_scenes": "/home/foo/deriva_imaging/tools/extract_scenes.py",
     "data_scratch": "/var/scratch/hatrac",
@@ -24,7 +25,7 @@
     "iiif_url": "https://deriva-imaging.isi.edu:8183/iiif/2",
     "model_file": "/home/foo/deriva_imaging/config/model.json",
     "mail_server": "relay.isi.edu",
-    "mail_sender": "Deriva Imaging Online Notification <no_reply@isi.edu>",
+    "mail_sender": "DERIVA IMAGING Online Notification <no_reply@isi.edu>",
     "mail_receiver": "foo@isi.edu",
     "mail_file": "/home/foo/deriva_imaging/logs/mail.log"
 }

@@ -40,6 +40,7 @@ import tempfile
 
 from deriva.core import PollingErmrestCatalog, HatracStore, urlquote
 from deriva.core.utils import hash_utils as hu
+from deriva.core.utils.core_utils import DEFAULT_CHUNK_SIZE
 
 from requests.exceptions import HTTPError
 from http import HTTPStatus
@@ -59,11 +60,11 @@ uuid = b'urn:uuid:'
 endTokens = [b'"', b'<']   
 ISI_NETWORK = '128.9' 
 
-class DerivaImagingClient (object):
+class DerivaImagingWorker (object):
     """Network client for generating tiled pyramid images.
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, kwargs):
         self.missing_scenes = False
         self.z_threshold = os.getenv('z_threshold', 5)
         self.model = kwargs.get('model')
@@ -74,7 +75,6 @@ class DerivaImagingClient (object):
             self.inherited_columns = self.inherited_columns.split(',')
         self.hatrac_template = kwargs.get('hatrac_template')
         self.iiif_url = kwargs.get('iiif_url')
-        hatrac_prefix = os.getenv('hatrac_prefix', None)
         self.compression_level = os.getenv('compression_level', 80)
         self.tile_size = os.getenv('tile_size', 1024)
         self.baseuri = kwargs.get('baseuri')
@@ -112,8 +112,7 @@ class DerivaImagingClient (object):
         self.curl = kwargs.get('curl')
         self.wget = kwargs.get('wget')
         self.cookie = kwargs.get('cookie')
-        self.host_server = os.getenv('host_server', None)
-        hatrac_server = os.getenv('hatrac', None)
+        self.host_server = socket.gethostname()
         self.hatrac_store = HatracStore(
             self.scheme, 
             self.host,
@@ -260,23 +259,6 @@ class DerivaImagingClient (object):
         return None
 
     """
-    Start the process for generating tiled pyramid images
-    """
-    def start(self):
-        try:
-            rid = os.getenv('RID', None)
-            if rid == None:
-                self.logger.error('RID was not specified in the environment')
-                return
-            
-            self.processImage(rid)
-        except:
-            et, ev, tb = sys.exc_info()
-            self.logger.error('got unexpected exception "%s"' % str(ev))
-            self.logger.error('%s' % ''.join(traceback.format_exception(et, ev, tb)))
-            self.sendMail('FAILURE IMAGE PROCESSING: Unexpected Start Exception', 'RID: %s\n%s\nThe process might have been stopped\n' % (rid, ''.join(traceback.format_exception(et, ev, tb))))
-            raise
-    """
     Copy the values that are inhereted from parent image into the scenes
     """    
     def getSceneRow(self, parent_row, scene, z_index, z_index_no, rid):
@@ -380,7 +362,7 @@ class DerivaImagingClient (object):
                                   })
             
             self.logger.debug('Hatrac error') 
-            return
+            return 1
                     
         """
         Convert the image to a tiled pyramid
@@ -402,7 +384,7 @@ class DerivaImagingClient (object):
                                   self.model['processing_status']: 'CONVERT ERROR'
                                   })
             self.logger.debug('convert2pyramid error') 
-            return
+            return 1
         
         for pyramid in self.tiff_files:
             if pyramid['series_details']['Thumbnail series'] == True:
@@ -438,7 +420,7 @@ class DerivaImagingClient (object):
                                   {'RID': rid,
                                   self.model['processing_status']: 'HTTP ERROR'
                                   })
-            return
+            return 1
         
         """
         Check that the thumbnail can be accessed
@@ -457,7 +439,7 @@ class DerivaImagingClient (object):
                                   {'RID': rid,
                                   self.model['processing_status']: 'GET THUMBNAIL ERROR'
                                   })
-            return
+            return 1
         
         """
         Set the viewer URI for the scenes
@@ -479,7 +461,7 @@ class DerivaImagingClient (object):
                                  {'RID': rid,
                                   self.model['processing_status']: error_name
                                  })
-            return
+            return 1
             
         self.removeConvertedFiles()
         
@@ -500,6 +482,8 @@ class DerivaImagingClient (object):
         self.logger.debug('SUCCEEDED created the tiled pyramid images for the file "%s".' % (filename)) 
         
         self.logger.debug('Ended Image Processing for the {};{} table.'.format(self.model['image_schema'], self.model['image_table'])) 
+        
+        return 0
         
     """
     Extract the file from hatrac
@@ -916,6 +900,7 @@ class DerivaImagingClient (object):
             hexa_sha256 = hashes['sha256'][0]
             base_md5 = self.getBaseMD5(file_name)
             new_uri = '{}/{}/{}'.format(self.hatrac_prefix, urlquote(rid), urlquote(file_name))
+            chunked = True if file_size > DEFAULT_CHUNK_SIZE else False
             
             """
             Store the images in hatrac if they are not already
@@ -944,7 +929,7 @@ class DerivaImagingClient (object):
                                                          md5 = new_md5,
                                                          sha256 = new_sha256,
                                                          content_type = content_type,
-                                                         chunked = True
+                                                         chunked = chunked
                                                        )
                 except:
                     et, ev, tb = sys.exc_info()
@@ -1118,11 +1103,13 @@ class DerivaImagingClient (object):
         if ome_tif_file_name != None and store_ome == True:
             file_name = ome_tif_file_name
             newFile = '/var/www/html/%s/%s' % (self.images, file_name)
+            file_size = os.path.getsize(newFile)
             hashes = hu.compute_file_hashes(newFile, hashes=['md5', 'sha256'])
             new_md5 = hashes['md5'][1]
             new_sha256 = hashes['sha256'][1]
             base_md5 = self.getBaseMD5(file_name)
             new_uri = '{}/{}/{}'.format(self.hatrac_prefix, urlquote(rid), urlquote(file_name))
+            chunked = True if file_size > DEFAULT_CHUNK_SIZE else False
             
             """
             Store the images in hatrac if they are not already
@@ -1151,7 +1138,7 @@ class DerivaImagingClient (object):
                                                          md5 = new_md5,
                                                          sha256 = new_sha256,
                                                          content_type = content_type,
-                                                         chunked = True
+                                                         chunked = chunked
                                                        )
                 except:
                     et, ev, tb = sys.exc_info()
@@ -1645,6 +1632,7 @@ class DerivaImagingClient (object):
             base_md5 = self.getBaseMD5(file_name, file_path)
             hexa_sha256 = hashes['sha256'][0]
             new_uri = '{}/{}/{}'.format(self.hatrac_prefix, urlquote(rid), urlquote(file_name))
+            chunked = True if file_size > DEFAULT_CHUNK_SIZE else False
             
             """
             Store the images in hatrac if they are not already
@@ -1677,7 +1665,7 @@ class DerivaImagingClient (object):
                                                          md5 = new_md5,
                                                          sha256 = new_sha256,
                                                          content_type = content_type,
-                                                         chunked = True
+                                                         chunked = chunked
                                                        )
                 except:
                     et, ev, tb = sys.exc_info()
