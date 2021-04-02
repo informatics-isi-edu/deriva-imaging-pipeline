@@ -68,11 +68,6 @@ class DerivaImagingWorker (object):
         self.missing_scenes = False
         self.z_threshold = os.getenv('z_threshold', 5)
         self.model = kwargs.get('model')
-        self.inherited_columns = self.model.get('inherited_columns')
-        if self.inherited_columns == None:
-            self.inherited_columns = []
-        else:
-            self.inherited_columns = self.inherited_columns.split(',')
         self.hatrac_template = kwargs.get('hatrac_template')
         self.iiif_url = kwargs.get('iiif_url')
         self.compression_level = os.getenv('compression_level', 80)
@@ -266,14 +261,11 @@ class DerivaImagingWorker (object):
         Inherit columns values from the parent and set values for the rest of the columns
         """
         row = {}
-        for k,v in parent_row.items():
-            if k in self.inherited_columns and v != None:
-                row[k] = v
         row[self.model['processing_status']] = 'success'
-        row[self.model['parent_image']] = rid
+        row['Parent_Image'] = rid
         if self.resolutions != None and len(self.resolutions) > 0:
-            row[self.model['pixels_per_meter']] = self.resolutions[0]
-        parent_original_file_name = parent_row[self.model['image_file_name']]
+            row['Pixels_Per_Meter'] = self.resolutions[0]
+        parent_original_file_name = parent_row['Original_File_Name']
         if parent_original_file_name == None:
             parent_original_file_name = rid
             file_name = rid
@@ -283,17 +275,30 @@ class DerivaImagingWorker (object):
                 file_name = parent_original_file_name[0:index]
             except:
                 file_name = parent_original_file_name
-        image_order = parent_row[self.model['image_order']]
+        image_order = parent_row['Image_Order']
         if image_order == None:
             image_order = 0
-        row[self.model['image_order']] = image_order + scene + 1
-        row[self.model['default_z']] = z_index
-        row[self.model['series']] = scene
-        row[self.model['image_file_name']] = '{} (image {})'.format(parent_original_file_name, scene)
-        row[self.model['generated_zs']] = 1 if z_index_no <= self.z_threshold else z_index_no
-        row[self.model['properties']] = self.tiff_files[scene]['series_properties']
+        row['Image_Order'] = image_order + scene + 1
+        row['Default_Z'] = z_index
+        row['Series'] = scene
+        row['Consortium'] = 'FaceBase'
+        row['Original_File_Name'] = '{} (image {})'.format(parent_original_file_name, scene)
+        row['Generated_Zs'] = 1 if z_index_no <= self.z_threshold else z_index_no
+        row['Properties'] = self.tiff_files[scene]['series_properties']
         return row
         
+    """
+    Create a record to be stored into the Image table
+    """    
+    def getImageRow(self, primary_row, rid):
+        row = {}
+        row['Original_File_Name'] = primary_row[self.model['primary_file_name']]
+        row['Original_File_URL'] = primary_row[self.model['primary_file_url']]
+        row['Original_File_Bytes'] = primary_row[self.model['primary_file_bytes']]
+        row['Original_File_MD5'] = primary_row[self.model['primary_file_md5']]
+        row['Consortium'] = 'FaceBase'
+        return row
+    
     """
     Get the Image Metadata from the pyramid
     """
@@ -329,19 +334,60 @@ class DerivaImagingWorker (object):
         """
         Query for detecting the image to be processed:
         
-        /entity/{image_schema}:{image_table}/RID={rid}
+        /entity/{image_schema}:{primary_table}/RID={rid}
         
         """
-        url = '/entity/{}:{}/RID={}'.format(urlquote(self.model['image_schema']), urlquote(self.model['image_table']), urlquote(rid))
-        self.logger.debug('Query URL: "{}"'.format(url)) 
+        url = '/entity/{}:{}/RID={}'.format(urlquote(self.model['image_schema']), urlquote(self.model['primary_table']), urlquote(rid))
+        self.logger.debug('Primary table query URL: "{}"'.format(url)) 
         
         resp = self.catalog.get(url)
         resp.raise_for_status()
         row = resp.json()[0]
         self.hatrac_prefix = self.hatrac_template.format(**row)
-        filename = row[self.model['image_file_name']]
-        file_url = row[self.model['image_file_url']]
-        image_row = row
+        filename = row[self.model['primary_file_name']]
+        file_url = row[self.model['primary_file_url']]
+        primary_row = row
+        
+        """
+        Create the Image record if necessary
+        """
+        if primary_row[self.model['primary_table_image_column']] == None:
+            """
+            POST url:
+            
+            /entity/{image_schema}:{image_table}
+            
+            """
+            url = '/entity/{}:{}'.format(urlquote(self.model['image_schema']), urlquote(self.model['image_table']))
+            image_row = self.getImageRow(primary_row, rid)
+            image_rid = self.createRecord(url, image_row, rid)
+            if image_rid == None:
+                return 1
+            """
+            update the primary table with the image value
+            """
+            returncode = self.updateAttributes(self.model['image_schema'],
+                                  self.model['primary_table'],
+                                  rid,
+                                  [self.model['primary_table_image_column']],
+                                  {'RID': rid,
+                                  self.model['primary_table_image_column']: image_rid
+                                  })
+            if returncode != 0:
+                return 1
+        else:
+            """
+            Query for getting the Image record:
+            
+            /entity/{image_schema}:{image_table}/RID=primary_row[{primary_table_image_column}]
+            
+            """
+            url = '/entity/{}:{}/RID={}'.format(urlquote(self.model['image_schema']), urlquote(self.model['image_table']), urlquote(primary_row[self.model['primary_table_image_column']]))
+            self.logger.debug('Query for getting the Image record: "{}"'.format(url)) 
+            resp = self.catalog.get(url)
+            resp.raise_for_status()
+            row = resp.json()[0]
+            image_row = row
         
         """
         Extract the file from hatrac
@@ -354,7 +400,7 @@ class DerivaImagingWorker (object):
             """
             
             self.updateAttributes(self.model['image_schema'],
-                                  self.model['image_table'],
+                                  self.model['primary_table'],
                                   rid,
                                   [self.model['processing_status']],
                                   {'RID': rid,
@@ -377,7 +423,7 @@ class DerivaImagingWorker (object):
             Update the image table with the failure result.
             """
             self.updateAttributes(self.model['image_schema'],
-                                  self.model['image_table'],
+                                  self.model['primary_table'],
                                   rid,
                                   [self.model['processing_status']],
                                   {'RID': rid,
@@ -401,7 +447,10 @@ class DerivaImagingWorker (object):
         self.logger.debug('JSON: {}'.format(self.json)) 
         self.logger.debug('Resolutions: {}'.format(self.resolutions))
         
-        self.get_image_properties(rid)
+        """
+        Set the image metadata into the pyramids tiff files
+        """
+        self.set_image_properties(rid)
         
         """
         Check that the metadata can be accessed
@@ -414,7 +463,7 @@ class DerivaImagingWorker (object):
             Update the image table with the failure result.
             """
             self.updateAttributes(self.model['image_schema'],
-                                  self.model['image_table'],
+                                  self.model['primary_table'],
                                   rid,
                                   [self.model['processing_status']],
                                   {'RID': rid,
@@ -433,7 +482,7 @@ class DerivaImagingWorker (object):
             Update the image table with the failure result.
             """
             self.updateAttributes(self.model['image_schema'],
-                                  self.model['image_table'],
+                                  self.model['primary_table'],
                                   rid,
                                   [self.model['processing_status']],
                                   {'RID': rid,
@@ -455,7 +504,7 @@ class DerivaImagingWorker (object):
             """
             self.removeConvertedFiles()
             self.updateAttributes(self.model['image_schema'],
-                                 self.model['image_table'],
+                                 self.model['primary_table'],
                                  rid,
                                  [self.model['processing_status']],
                                  {'RID': rid,
@@ -474,14 +523,14 @@ class DerivaImagingWorker (object):
         columns = [self.model['processing_status']]
 
         self.updateAttributes(self.model['image_schema'],
-                              self.model['image_table'],
+                              self.model['primary_table'],
                               rid,
                               columns,
                               obj)
         
         self.logger.debug('SUCCEEDED created the tiled pyramid images for the file "%s".' % (filename)) 
         
-        self.logger.debug('Ended Image Processing for the {};{} table.'.format(self.model['image_schema'], self.model['image_table'])) 
+        self.logger.debug('Ended Image Processing for the {};{} table.'.format(self.model['image_schema'], self.model['primary_table'])) 
         
         return 0
         
@@ -594,9 +643,9 @@ class DerivaImagingWorker (object):
         return (None, None, None, None)
 
     """
-    Get the image metadata
+    Set the image metadata into the pyramids tiff files
     """
-    def get_image_properties(self, rid):
+    def set_image_properties(self, rid):
         series_no = 0
         z_index_no = 0
         channels_no = 0
@@ -708,10 +757,10 @@ class DerivaImagingWorker (object):
         """
         Get the scenes
         
-        /attribute/{image_schema}:{image_table}/{parent_image}={rid}/RID,{series}@sort({series})
+        /attribute/{image_schema}:{image_table}/Parent_Image={rid}/RID,Series@sort(Series)
         
         """
-        url = '/attribute/{}:{}/{}={}/RID,{}@sort({})'.format(urlquote(self.model['image_schema']), urlquote(self.model['image_table']), urlquote(self.model['parent_image']), rid, urlquote(self.model['series']), urlquote(self.model['series']))
+        url = '/attribute/{}:{}/Parent_Image={}/RID,Series@sort(Series)'.format(urlquote(self.model['image_schema']), urlquote(self.model['image_table']), parent_row['RID'])
         resp = self.catalog.get(url)
         resp.raise_for_status()
         rows = resp.json()
@@ -724,22 +773,22 @@ class DerivaImagingWorker (object):
         """
         Delete the references from Processed_Image for the scenes
         """
-        scene_rows.append({'RID': rid, 'Series': None})
+        scene_rows.append({'RID': parent_row['RID'], 'Series': None})
         for scene_row in scene_rows:
             image_rid = scene_row['RID']
             """
-            /attribute/{image_schema}:{processed_image}/{processed_image_reference_image}={image_rid}/RID
+            /attribute/{image_schema}:{processed_image}/Reference_Image={image_rid}/RID
             """
-            url = '/attribute/{}:{}/{}={}/RID'.format(urlquote(self.model['image_schema']), urlquote(self.model['processed_image']), urlquote(self.model['processed_image_reference_image']), image_rid)
+            url = '/attribute/{}:{}/Reference_Image={}/RID'.format(urlquote(self.model['image_schema']), urlquote(self.model['processed_image']), image_rid)
             resp = self.catalog.get(url)
             resp.raise_for_status()
             rows = resp.json()
             if len(rows) > 0:
                 self.logger.debug('Processed_Image to be deleted: {}'.format(json.dumps(rows, indent = 4)))
                 """
-                /entity/{image_schema}:{processed_image}/{processed_image_reference_image}={image_rid}
+                /entity/{image_schema}:{processed_image}/Reference_Image={image_rid}
                 """
-                if self.deleteEntity('{}:{}/{}={}'.format(urlquote(self.model['image_schema']), urlquote(self.model['processed_image']), urlquote(self.model['processed_image_reference_image']), urlquote(image_rid)), rid) != 0:
+                if self.deleteEntity('{}:{}/Reference_Image={}'.format(urlquote(self.model['image_schema']), urlquote(self.model['processed_image']), urlquote(image_rid)), rid) != 0:
                     return 1
         
         """
@@ -748,18 +797,18 @@ class DerivaImagingWorker (object):
         for scene_row in scene_rows:
             image_rid = scene_row['RID']
             """
-            /attribute/{image_schema}:{image_channel}/{image_channel_image}={image_rid}/RID
+            /attribute/{image_schema}:{image_channel}/Image={image_rid}/RID
             """
-            url = '/attribute/{}:{}/{}={}/RID'.format(urlquote(self.model['image_schema']), urlquote(self.model['image_channel']), urlquote(self.model['image_channel_image']), image_rid)
+            url = '/attribute/{}:{}/Image={}/RID'.format(urlquote(self.model['image_schema']), urlquote(self.model['image_channel']), image_rid)
             resp = self.catalog.get(url)
             resp.raise_for_status()
             rows = resp.json()
             if len(rows) > 0:
                 self.logger.debug('Image_Channel to be deleted: {}'.format(json.dumps(rows, indent = 4)))
                 """
-                /entity/{image_schema}:{image_channel}/{image_channel_image}={image_rid}
+                /entity/{image_schema}:{image_channel}/Image={image_rid}
                 """
-                if self.deleteEntity('{}:{}/{}={}'.format(urlquote(self.model['image_schema']), urlquote(self.model['image_channel']), urlquote(self.model['image_channel_image']), urlquote(image_rid)), rid) != 0:
+                if self.deleteEntity('{}:{}/Image={}'.format(urlquote(self.model['image_schema']), urlquote(self.model['image_channel']),  urlquote(image_rid)), rid) != 0:
                     return 1
         
         """
@@ -768,26 +817,26 @@ class DerivaImagingWorker (object):
         for scene_row in scene_rows:
             image_rid = scene_row['RID']
             """
-            /attribute/{image_schema}:{image_z}/{image_z_image}={image_rid}/RID
+            /attribute/{image_schema}:{image_z}/Image={image_rid}/RID
             """
-            url = '/attribute/{}:{}/{}={}/RID'.format(urlquote(self.model['image_schema']), urlquote(self.model['image_z']), urlquote(self.model['image_z_image']), image_rid)
+            url = '/attribute/{}:{}/Image={}/RID'.format(urlquote(self.model['image_schema']), urlquote(self.model['image_z']), image_rid)
             resp = self.catalog.get(url)
             resp.raise_for_status()
             rows = resp.json()
             if len(rows) > 0:
                 self.logger.debug('Image_Z to be deleted: {}'.format(json.dumps(rows, indent = 4)))
                 """
-                /entity/{image_schema}:{image_z}/{image_z_image}={image_rid}
+                /entity/{image_schema}:{image_z}/Image={image_rid}
                 """
-                if self.deleteEntity('{}:{}/{}={}'.format(urlquote(self.model['image_schema']), urlquote(self.model['image_z']), urlquote(self.model['image_z_image']), urlquote(image_rid)), rid) != 0:
+                if self.deleteEntity('{}:{}/Image={}'.format(urlquote(self.model['image_schema']), urlquote(self.model['image_z']), urlquote(image_rid)), rid) != 0:
                     return 1
         
         """
         Build now the scene rows with middle_z_index
         """
-        original_file_name = parent_row[self.model['image_file_name']]
+        original_file_name = parent_row['Original_File_Name']
         if original_file_name == None:
-            file_name = rid
+            file_name = parent_row['RID']
         else:
             try:
                 index = original_file_name.rindex('.')
@@ -796,35 +845,35 @@ class DerivaImagingWorker (object):
                 file_name = original_file_name
 
         if series_no == 1:
-            scenes['0'] = rid
+            scenes['0'] = parent_row['RID']
             pyramid = self.tiff_files[0]
-            cols = [self.model['metadata_url'], self.model['metadata_name'], self.model['metadata_bytes'], self.model['metadata_md5'], 
-                    self.model['ome_xml_url'], self.model['ome_xml_name'], self.model['ome_xml_bytes'], self.model['ome_xml_md5'], 
-                    self.model['generated_zs'], self.model['properties'], self.model['total_series'], self.model['series'], self.model['default_z']]
+            cols = ['Metadata_URL', 'Metadata_Name', 'Metadata_Bytes', 'Metadata_MD5', 
+                    'OME_XML_URL', 'OME_XML_Name', 'OME_XML_Bytes', 'OME_XML_MD5', 
+                    'Generated_Zs', 'Properties', 'Total_Series', 'Series', 'Default_Z']
             OME_XML_URL, OME_XML_Name, OME_XML_Bytes, OME_XML_MD5 = self.getCompanionInfo(0, None, companion)
             obj = {
-                self.model['metadata_url']: Metadata_URL,
-                self.model['metadata_name']: Metadata_Name, 
-                self.model['metadata_bytes']: Metadata_Bytes, 
-                self.model['metadata_md5']: Metadata_MD5, 
-                self.model['ome_xml_url']: OME_XML_URL, 
-                self.model['ome_xml_name']: OME_XML_Name, 
-                self.model['ome_xml_bytes']: OME_XML_Bytes, 
-                self.model['ome_xml_md5']: OME_XML_MD5,
-                self.model['generated_zs']: 1 if z_index_no <= self.z_threshold else z_index_no,
-                self.model['properties']: self.tiff_files[0]['series_properties'],
-                self.model['total_series']: None,
-                self.model['series']: None,
-                self.model['default_z']: middle_z_index
+                'Metadata_URL': Metadata_URL,
+                'Metadata_Name': Metadata_Name, 
+                'Metadata_Bytes': Metadata_Bytes, 
+                'Metadata_MD5': Metadata_MD5, 
+                'OME_XML_URL': OME_XML_URL, 
+                'OME_XML_Name': OME_XML_Name, 
+                'OME_XML_Bytes': OME_XML_Bytes, 
+                'OME_XML_MD5': OME_XML_MD5,
+                'Generated_Zs': 1 if z_index_no <= self.z_threshold else z_index_no,
+                'Properties': self.tiff_files[0]['series_properties'],
+                'Total_Series': None,
+                'Series': None,
+                'Default_Z': middle_z_index
             }
-            if parent_row[self.model['image_order']] == None:
-                cols.append(self.model['image_order'])
-                obj[self.model['image_order']] = 1
-            if parent_row[self.model['image_file_name']] == None:
-                cols.append(self.model['image_file_name'])
-                obj[self.model['image_file_name']] = '{} (image 0)'.format(rid)
+            if parent_row['Image_Order'] == None:
+                cols.append('Image_Order')
+                obj['Image_Order'] = 1
+            if parent_row['Original_File_Name'] == None:
+                cols.append('Original_File_Name')
+                obj['Original_File_Name'] = '{} (image 0)'.format(parent_row['RID'])
             if len(cols) > 0:
-                obj['RID'] = rid
+                obj['RID'] = parent_row['RID']
                 returncode = self.updateAttributes(self.model['image_schema'],
                                       self.model['image_table'],
                                       rid,
@@ -833,26 +882,26 @@ class DerivaImagingWorker (object):
                 if returncode != 0:
                     return returncode
         else:
-            cols = [self.model['metadata_url'], self.model['metadata_name'], self.model['metadata_bytes'], self.model['metadata_md5'], 
-                    self.model['ome_xml_url'], self.model['ome_xml_name'], self.model['ome_xml_bytes'], self.model['ome_xml_md5'], 
-                    self.model['total_series'], self.model['generated_zs'], self.model['series'], self.model['properties']]
+            cols = ['Metadata_URL', 'Metadata_Name', 'Metadata_Bytes', 'Metadata_MD5', 
+                    'OME_XML_URL', 'OME_XML_Name', 'OME_XML_Bytes', 'OME_XML_MD5', 
+                    'Total_Series', 'Generated_Zs', 'Series', 'Properties']
             OME_XML_URL, OME_XML_Name, OME_XML_Bytes, OME_XML_MD5 = self.getCompanionInfo(None, None, companion)
             obj = {
-                self.model['metadata_url']: Metadata_URL,
-                self.model['metadata_name']: Metadata_Name, 
-                self.model['metadata_bytes']: Metadata_Bytes, 
-                self.model['metadata_md5']: Metadata_MD5, 
-                self.model['ome_xml_url']: OME_XML_URL, 
-                self.model['ome_xml_name']: OME_XML_Name, 
-                self.model['ome_xml_bytes']: OME_XML_Bytes, 
-                self.model['ome_xml_md5']: OME_XML_MD5,
-                self.model['total_series']: series_no,
-                self.model['generated_zs']: None,
-                self.model['series']: None,
-                self.model['properties']: None
+                'Metadata_URL': Metadata_URL,
+                'Metadata_Name': Metadata_Name, 
+                'Metadata_Bytes': Metadata_Bytes, 
+                'Metadata_MD5': Metadata_MD5, 
+                'OME_XML_URL': OME_XML_URL, 
+                'OME_XML_Name': OME_XML_Name, 
+                'OME_XML_Bytes': OME_XML_Bytes, 
+                'OME_XML_MD5': OME_XML_MD5,
+                'Total_Series': series_no,
+                'Generated_Zs': None,
+                'Series': None,
+                'Properties': None
             }
             if len(cols) > 0:
-                obj['RID'] = rid
+                obj['RID'] = parent_row['RID']
                 returncode = self.updateAttributes(self.model['image_schema'],
                                       self.model['image_table'],
                                       rid,
@@ -862,10 +911,13 @@ class DerivaImagingWorker (object):
                     return returncode
 
             for serie in series:
-                row = self.getSceneRow(parent_row, serie, middle_z_index, z_index_no, rid)
+                """
+                Copy the columns from the parent table
+                """
+                row = self.getSceneRow(parent_row, serie, middle_z_index, z_index_no, parent_row['RID'])
                 if update_scenes == False:
                     """
-                    Copy the columns from the parent table
+                    POST url: /entity/{image_schema}:{image_table}
                     """
                     scene_rid = self.createRecord('/entity/{}:{}'.format(urlquote(self.model['image_schema']), urlquote(self.model['image_table'])), row, rid)
                     if scene_rid == None:
@@ -966,18 +1018,18 @@ class DerivaImagingWorker (object):
             if len(config_tiffinfo) > 0:
                 config['tiffinfo'] = config_tiffinfo
                 
-            reference_image = rid
+            reference_image = parent_row['RID']
             if pyramid['series_details']['Thumbnail series'] == False:
                 reference_image = scenes[str(pyramid['series'])]
-            row = {self.model['processed_image_file_name']: file_name,
-                   self.model['processed_image_file_url']: hatrac_URI,
-                   self.model['processed_image_file_bytes']: file_size,
-                   self.model['processed_image_file_md5']: hexa_md5,
-                   self.model['processed_image_config']: config,
-                   self.model['processed_image_channel_number']: pyramid['channel'],
-                   self.model['processed_image_z_index']: pyramid['z'],
-                   self.model['processed_image_reference_image']: reference_image,
-                   self.model['processed_image_display_method']: 'iiif',
+            row = {'File_Name': file_name,
+                   'File_URL': hatrac_URI,
+                   'File_Bytes': file_size,
+                   'File_MD5': hexa_md5,
+                   'Config': config,
+                   'Channel_Number': pyramid['channel'],
+                   'Z_Index': pyramid['z'],
+                   'Reference_Image': reference_image,
+                   'Display_Method': 'iiif',
                    }
             
             pyramid['row'] = row
@@ -1017,22 +1069,22 @@ class DerivaImagingWorker (object):
             returncode = self.updateAttributes(self.model['image_schema'],
                                             self.model['image_table'],
                                             scenes[str(serie)],
-                                            [self.model['default_thumbnail_url'], self.model['default_z'], 
-                                             self.model['download_tiff_url'], self.model['download_tiff_name'], self.model['download_tiff_bytes'], self.model['download_tiff_md5'], 
-                                             self.model['pixels_per_meter'], 
-                                             self.model['ome_xml_url'], self.model['ome_xml_name'], self.model['ome_xml_bytes'], self.model['ome_xml_md5']],
+                                            ['Default_Thumbnail_URL', 'Default_Z', 
+                                             'Download_Tiff_URL', 'Download_Tiff_Name', 'Download_Tiff_Bytes', 'Download_Tiff_MD5', 
+                                             'Pixels_Per_Meter', 
+                                             'OME_XML_URL', 'OME_XML_Name', 'OME_XML_Bytes', 'OME_XML_MD5'],
                                             {'RID': scenes[str(serie)],
-                                            self.model['default_thumbnail_url']: thumbnail_url,
-                                            self.model['default_z']: middle_z_index,
-                                            self.model['download_tiff_url']: download_tiff_url,
-                                            self.model['download_tiff_name']: download_tiff_file_name,
-                                            self.model['download_tiff_bytes']: download_tiff_file_bytes,
-                                            self.model['download_tiff_md5']: download_tiff_file_md5,
-                                            self.model['ome_xml_url']: OME_XML_URL, 
-                                            self.model['ome_xml_name']: OME_XML_Name, 
-                                            self.model['ome_xml_bytes']: OME_XML_Bytes, 
-                                            self.model['ome_xml_md5']: OME_XML_MD5,
-                                            self.model['pixels_per_meter']: pixels_per_meter
+                                            'Default_Thumbnail_URL': thumbnail_url,
+                                            'Default_Z': middle_z_index,
+                                            'Download_Tiff_URL': download_tiff_url,
+                                            'Download_Tiff_Name': download_tiff_file_name,
+                                            'Download_Tiff_Bytes': download_tiff_file_bytes,
+                                            'Download_Tiff_MD5': download_tiff_file_md5,
+                                            'OME_XML_URL': OME_XML_URL, 
+                                            'OME_XML_Name': OME_XML_Name, 
+                                            'OME_XML_Bytes': OME_XML_Bytes, 
+                                            'OME_XML_MD5': OME_XML_MD5,
+                                            'Pixels_Per_Meter': pixels_per_meter
                                   })
             if returncode != 0:
                 return returncode
@@ -1042,12 +1094,12 @@ class DerivaImagingWorker (object):
         """
         for pyramid in self.tiff_files:
             if pyramid['z'] == middle_z_index:
-                row = {self.model['image_channel_image']: scenes[str(pyramid['series'])],
-                       self.model['image_channel_channel_number']: pyramid['channel'],
-                       self.model['image_channel_pseudo_color']: None if pyramid['channel_color']==None else '#'+pyramid['channel_color'][2:],
-                       self.model['image_channel_is_rgb']: pyramid['IS_RGB'],
-                       self.model['image_channel_name']: pyramid['channel_name'],
-                       self.model['image_channel_notes']: None
+                row = {'Image': scenes[str(pyramid['series'])],
+                       'Channel_Number': pyramid['channel'],
+                       'Pseudo_Color': None if pyramid['channel_color']==None else '#'+pyramid['channel_color'][2:],
+                       'Is_RGB': pyramid['IS_RGB'],
+                       'Name': pyramid['channel_name'],
+                       'Notes': None
                        }
                 image_channel_rid = self.createRecord('/entity/{}:{}'.format(urlquote(self.model['image_schema']), urlquote(self.model['image_channel'])), row, rid)
                 if image_channel_rid == None:
@@ -1065,12 +1117,12 @@ class DerivaImagingWorker (object):
                     continue
                 
                 OME_XML_URL, OME_XML_Name, OME_XML_Bytes, OME_XML_MD5 = self.getCompanionInfo(pyramid['series'], pyramid['z'], companion)
-                row = {self.model['image_z_image']: scenes[str(pyramid['series'])],
-                       self.model['image_z_z_index']: pyramid['z'],
-                       self.model['image_z_ome_companion_url']: OME_XML_URL,
-                       self.model['image_z_ome_companion_name']: OME_XML_Name,
-                       self.model['image_z_ome_companion_bytes']: OME_XML_Bytes,
-                       self.model['image_z_ome_companion_md5']: OME_XML_MD5
+                row = {'Image': scenes[str(pyramid['series'])],
+                       'Z_Index': pyramid['z'],
+                       'OME_Companion_URL': OME_XML_URL,
+                       'OME_Companion_Name': OME_XML_Name,
+                       'OME_Companion_Bytes': OME_XML_Bytes,
+                       'OME_Companion_MD5': OME_XML_MD5
                        }
                 image_z_rid = self.createRecord('/entity/{}:{}'.format(urlquote(self.model['image_schema']), urlquote(self.model['image_z'])), row, rid)
                 if image_z_rid == None:
@@ -1158,30 +1210,30 @@ class DerivaImagingWorker (object):
         returncode = self.updateAttributes(self.model['image_schema'],
                                           self.model['image_table'],
                                           rid,
-                                          [self.model['default_thumbnail_url'], self.model['default_z'], 
-                                           self.model['download_tiff_url'], self.model['download_tiff_name'], self.model['download_tiff_bytes'], self.model['download_tiff_md5'], 
-                                           self.model['pixels_per_meter'], self.model['series'], 
-                                           self.model['metadata_url'], self.model['metadata_name'], self.model['metadata_bytes'], self.model['metadata_md5'], 
-                                           self.model['ome_xml_url'], self.model['ome_xml_name'], self.model['ome_xml_bytes'], self.model['ome_xml_md5'], 
-                                           self.model['total_series']],
+                                          ['Default_Thumbnail_URL', 'Default_Z', 
+                                           'Download_Tiff_URL', 'Download_Tiff_Name', 'Download_Tiff_Bytes', 'Download_Tiff_MD5', 
+                                           'Pixels_Per_Meter', 'Series', 
+                                           'Metadata_URL', 'Metadata_Name', 'Metadata_Bytes', 'Metadata_MD5', 
+                                           'OME_XML_URL', 'OME_XML_Name', 'OME_XML_Bytes', 'OME_XML_MD5', 
+                                           'Total_Series'],
                                           {'RID': rid,
-                                          self.model['default_thumbnail_url']: None,
-                                          self.model['default_z']: None,
-                                          self.model['download_tiff_url']: download_tiff_url,
-                                          self.model['download_tiff_name']: download_tiff_file_name,
-                                          self.model['download_tiff_bytes']: download_tiff_file_bytes,
-                                          self.model['download_tiff_md5']: download_tiff_file_md5,
-                                          self.model['pixels_per_meter']: None,
-                                          self.model['series']: None,
-                                        self.model['metadata_url']: Metadata_URL,
-                                        self.model['metadata_name']: Metadata_Name, 
-                                        self.model['metadata_bytes']: Metadata_Bytes, 
-                                        self.model['metadata_md5']: Metadata_MD5, 
-                                        self.model['ome_xml_url']: OME_XML_URL, 
-                                        self.model['ome_xml_name']: OME_XML_Name, 
-                                        self.model['ome_xml_bytes']: OME_XML_Bytes, 
-                                        self.model['ome_xml_md5']: OME_XML_MD5,
-                                        self.model['total_series']: series_no
+                                          'Default_Thumbnail_URL': None,
+                                          'Default_Z': None,
+                                          'Download_Tiff_URL': download_tiff_url,
+                                          'Download_Tiff_Name': download_tiff_file_name,
+                                          'Download_Tiff_Bytes': download_tiff_file_bytes,
+                                          'Download_Tiff_MD5': download_tiff_file_md5,
+                                          'Pixels_Per_Meter': None,
+                                          'Series': None,
+                                        'Metadata_URL': Metadata_URL,
+                                        'Metadata_Name': Metadata_Name, 
+                                        'Metadata_Bytes': Metadata_Bytes, 
+                                        'Metadata_MD5': Metadata_MD5, 
+                                        'OME_XML_URL': OME_XML_URL, 
+                                        'OME_XML_Name': OME_XML_Name, 
+                                        'OME_XML_Bytes': OME_XML_Bytes, 
+                                        'OME_XML_MD5': OME_XML_MD5,
+                                        'Total_Series': series_no
                                           })
         
         return returncode

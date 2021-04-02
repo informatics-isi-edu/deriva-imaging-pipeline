@@ -16,6 +16,35 @@ from deriva.core import ErmrestCatalog, get_credential
 from deriva.core.ermrest_model import builtin_types, Table, Key, ForeignKey, Column
 from deriva.core.ermrest_model import tag as chaise_tags
 
+def add_annotation(catalog, schema_name, table_name, value):
+    model = catalog.getCatalogModel()
+    schema = model.schemas[schema_name]
+    if table_name in schema.tables:
+        table = schema.tables[table_name]
+        visible_columns = table.annotations['tag:isrd.isi.edu,2016:visible-columns']['detailed']
+        if value not in visible_columns:
+            visible_columns.append(value)
+            print('Applying annotations ...')
+            model.apply()
+            return
+    
+def drop_annotation(catalog, schema_name, table_name, value):
+    model = catalog.getCatalogModel()
+    schema = model.schemas[schema_name]
+    if table_name in schema.tables:
+        table = schema.tables[table_name]
+        visible_columns = table.annotations['tag:isrd.isi.edu,2016:visible-columns']['detailed']
+        if value in visible_columns:
+            i = 0
+            for visible_column in visible_columns:
+                if visible_column == value:
+                    del visible_columns[i]
+                    model.apply()
+                    print('Dropping annotations ...')
+                    return
+                else:
+                    i +=1
+    
 def drop_primary_key_if_exist(catalog, schema_name, table_name, unique_columns):
     model = catalog.getCatalogModel()
     schema = model.schemas[schema_name]
@@ -60,41 +89,25 @@ def drop_table_if_exist(catalog, schema_name, table_name):
 Restore the database to the previous status.
 """
 def restore(catalog):
-    drop_foreign_key_if_exist(catalog, 'isa', 'imaging_data', ['parent_image'])
+    drop_annotation(catalog, 'isa', 'imaging_data', ['isa', 'imaging_data_image_fkey'])
+
+    drop_foreign_key_if_exist(catalog, 'isa', 'imaging_data', ['image'])
     drop_foreign_key_if_exist(catalog, 'isa', 'imaging_data', ['processing_status'])
     
-    drop_primary_key_if_exist(catalog, 'isa', 'imaging_data', ['RID', 'default_z'])
-    
-    drop_column_if_exist(catalog, 'isa', 'imaging_data', 'image_order')
-    drop_column_if_exist(catalog, 'isa', 'imaging_data', 'notes')
+    drop_column_if_exist(catalog, 'isa', 'imaging_data', 'image')
     drop_column_if_exist(catalog, 'isa', 'imaging_data', 'processing_status')
-    drop_column_if_exist(catalog, 'isa', 'imaging_data', 'pixels_per_meter')
-    drop_column_if_exist(catalog, 'isa', 'imaging_data', 'default_thumbnail_url')
-    drop_column_if_exist(catalog, 'isa', 'imaging_data', 'parent_image')
-    drop_column_if_exist(catalog, 'isa', 'imaging_data', 'default_z')
-    drop_column_if_exist(catalog, 'isa', 'imaging_data', 'series')
-    drop_column_if_exist(catalog, 'isa', 'imaging_data', 'download_tiff_url')
-    drop_column_if_exist(catalog, 'isa', 'imaging_data', 'download_tiff_name')
-    drop_column_if_exist(catalog, 'isa', 'imaging_data', 'download_tiff_bytes')
-    drop_column_if_exist(catalog, 'isa', 'imaging_data', 'download_tiff_md5')
-    drop_column_if_exist(catalog, 'isa', 'imaging_data', 'total_series')
-    drop_column_if_exist(catalog, 'isa', 'imaging_data', 'metadata_url')
-    drop_column_if_exist(catalog, 'isa', 'imaging_data', 'metadata_name')
-    drop_column_if_exist(catalog, 'isa', 'imaging_data', 'metadata_md5')
-    drop_column_if_exist(catalog, 'isa', 'imaging_data', 'metadata_bytes')
-    drop_column_if_exist(catalog, 'isa', 'imaging_data', 'ome_xml_url')
-    drop_column_if_exist(catalog, 'isa', 'imaging_data', 'ome_xml_name')
-    drop_column_if_exist(catalog, 'isa', 'imaging_data', 'ome_xml_md5')
-    drop_column_if_exist(catalog, 'isa', 'imaging_data', 'ome_xml_bytes')
-    drop_column_if_exist(catalog, 'isa', 'imaging_data', 'properties')
-    drop_column_if_exist(catalog, 'isa', 'imaging_data', 'generated_zs')
+    
+    drop_table_if_exist(catalog, 'isa', 'Image_Annotation')
+    drop_table_if_exist(catalog, 'isa', 'Image_Annotation_File')
+    drop_table_if_exist(catalog, 'isa', 'Processed_Image')
+    drop_table_if_exist(catalog, 'isa', 'Image_Channel')
+    drop_table_if_exist(catalog, 'isa', 'Image_Z')
+    drop_table_if_exist(catalog, 'isa', 'Image')
 
-    drop_table_if_exist(catalog, 'isa', 'processed_image')
-    drop_table_if_exist(catalog, 'isa', 'image_channel')
-    drop_table_if_exist(catalog, 'isa', 'image_z')
     drop_table_if_exist(catalog, 'vocab', 'color')
     drop_table_if_exist(catalog, 'vocab', 'display_method')
     drop_table_if_exist(catalog, 'vocab', 'processing_status')
+    drop_table_if_exist(catalog, 'vocab', 'consortium')
 
 def create_vocabulary_table_if_not_exist(catalog, schema_name, table_name, comment):
     model = catalog.getCatalogModel()
@@ -132,6 +145,16 @@ def add_rows_to_vocab_display_method(catalog):
     display_method = schema.display_method
     display_method.insert(rows, defaults=['ID', 'URI'])
 
+def add_rows_to_vocab_consortium(catalog):
+
+    rows =[
+        {'Name': 'FaceBase', 'Description': 'Comprehensive craniofacial data'},
+    ]
+    pb = catalog.getPathBuilder()
+    schema = pb.vocab
+    display_method = schema.consortium
+    display_method.insert(rows, defaults=['ID', 'URI'])
+
 def add_rows_to_vocab_color(catalog):
 
     rows =[
@@ -148,82 +171,101 @@ def add_rows_to_vocab_color(catalog):
     color = schema.color
     color.insert(rows, defaults=['ID', 'URI'])
 
-def create_processed_image_table(catalog, schema_name):
-    table_name = 'processed_image'
+def create_processed_image_table_if_not_exists(catalog, schema_name):
+    annotations = {
+        "tag:isrd.isi.edu,2016:generated": None,
+        "tag:isrd.isi.edu,2016:table-display": {
+          "compact": {
+            "row_markdown_pattern": "[{{{RID}}}:{{{File_Name}}} ({{{File_Bytes}}} bytes)]({{{File_URL}}}){.download-alt}"
+          }
+        }
+      }
+
+    table_name = 'Processed_Image'
     comment = 'Table for storing the metadata of the processed images.'
     model = catalog.getCatalogModel()
     schema = model.schemas[schema_name]
     if table_name not in schema.tables:
         column_defs = [
             Column.define(
-                'reference_image',
+                'Reference_Image',
                 builtin_types.text,
                 comment='The RID of the original image.',                        
                 nullok=False
                 ),
             Column.define(
-                'channel_number',
+                'Channel_Number',
                 builtin_types.int4,
                 comment='Color channel of this processed image.',
                 default=0,                      
                 nullok=False
                 ),
             Column.define(
-                'file_name',
+                'File_Name',
                 builtin_types.text,
                 nullok=True
                 ),
             Column.define(
-                'file_url',
+                'File_URL',
                 builtin_types.text,
                 comment='The hatrac location.',
                 nullok=True
                 ),
             Column.define(
-                'file_bytes',
+                'File_Bytes',
                 builtin_types.int8,
                 nullok=True
                 ),
             Column.define(
-                'file_md5',
+                'File_MD5',
                 builtin_types.text,
                 nullok=True
                 ),
             Column.define(
-                'config',
+                'id',
+                builtin_types.text,
+                nullok=True
+                ),
+            Column.define(
+                'uri',
+                builtin_types.text,
+                nullok=True
+                ),
+            Column.define(
+                'Config',
                 builtin_types.jsonb,
                 nullok=True
                 ),
             Column.define(
-                'z_index',
+                'Z_Index',
                 builtin_types.int4,
                 nullok=True
                 ),
             Column.define(
-                'display_method',
+                'Display_Method',
                 builtin_types.text,
                 nullok=True
                 )
             ]
 
         key_defs = [
-            Key.define(['reference_image', 'channel_number', 'z_index'],
-                       constraint_names=[['isa', 'processed_image_reference_image_channel_number_z_index_key']]
+            Key.define(['Reference_Image', 'Channel_Number', 'Z_Index'],
+                       constraint_names=[['isa', 'Processed_Image_Reference_Image_Channel_Number_Z_Index_key']]
             )
         ]
         fkey_defs = [
-            ForeignKey.define(['display_method'], 'vocab', 'display_method', ['Name'],
-                              constraint_names=[['isa', 'processed_image_display_method_fkey']],
+            ForeignKey.define(['Display_Method'], 'vocab', 'display_method', ['Name'],
+                              constraint_names=[['isa', 'Processed_Image_Display_Method_fkey']],
                               on_update='CASCADE',
                               on_delete='NO ACTION'   
             ),
-            ForeignKey.define(['reference_image', 'channel_number'], 'isa', 'image_channel', ['image', 'channel_number'],
-                              constraint_names=[['isa', 'processed_image_reference_image_channel_number_fkey']],
+            ForeignKey.define(['Reference_Image', 'Channel_Number'], 'isa', 'Image_Channel', ['Image', 'Channel_Number'],
+                              constraint_names=[['isa', 'Processed_Image_Reference_Image_Channel_Number_fkey']],
                               on_update='CASCADE',
                               on_delete='NO ACTION'
             ),
-            ForeignKey.define(['reference_image'], 'isa', 'imaging_data', ['RID'],
-                              constraint_names=[['isa', 'processed_image_reference_image_fkey']],
+            ForeignKey.define(['Reference_Image'], 'isa', 'Image', ['RID'],
+                              constraint_names=[['isa', 'Processed_Image_Reference_Image_fkey']],
                               on_update='NO ACTION',
                               on_delete='CASCADE'   
             )
@@ -234,78 +276,119 @@ def create_processed_image_table(catalog, schema_name):
             key_defs=key_defs,
             fkey_defs=fkey_defs,
             comment=comment,
+            annotations=annotations,
             provide_system=True
         )
         
         schema.create_table(table_def)
         
-def create_image_channel_table(catalog, schema_name):
-    table_name = 'image_channel'
-    comment = 'Table for storing the channel metadata.'
+def create_image_channel_table_if_not_exists(catalog, schema_name):
+    annotations = {
+        "tag:isrd.isi.edu,2016:table-display": {
+          "row_name": {
+            "template_engine": "handlebars",
+            "row_markdown_pattern": "{{{Channel_Number}}}{{#if Name}}:{{{Name}}}{{/if}}{{#if Notes}} ({{{Notes}}}){{/if}}"
+          }
+        },
+        "tag:isrd.isi.edu,2016:visible-columns": {
+          "*": [
+            {
+              "source": "RID"
+            },
+            {
+              "source": [
+                {
+                  "outbound": [
+                    "isa",
+                    "Image_Channel_Image_fkey"
+                  ]
+                },
+                "RID"
+              ],
+              "markdown_name": "Image"
+            },
+            {
+              "source": "Channel_Number"
+            },
+            {
+              "source": "Name"
+            },
+            {
+              "source": "Color_Type"
+            },
+            {
+              "source": "Notes"
+            }
+          ]
+        }
+      }
+
+    table_name = 'Image_Channel'
+    comment = 'Image Channel'
     model = catalog.getCatalogModel()
     schema = model.schemas[schema_name]
     if table_name not in schema.tables:
         column_defs = [
             Column.define(
-                'image',
+                'Image',
                 builtin_types.text,
                 comment='The image associated with this channel.',                        
                 nullok=False
                 ),
             Column.define(
-                'channel_number',
+                'Channel_Number',
                 builtin_types.int4,
                 comment='Which channel (1,2, 3, ...).',
                 nullok=False
                 ),
             Column.define(
-                'legacy_color',
+                'Legacy_Color',
                 builtin_types.text,
                 comment='Color type (e.g., "DAPI" or "Combo") or color (red, blue, etc.)',
                 nullok=True
                 ),
             Column.define(
-                'name',
+                'Name',
                 builtin_types.text,
                 comment='Channel name (name of the gene/protein displayed on the channel)',
                 nullok=False
                 ),
             Column.define(
-                'image_url',
+                'Image_URL',
                 builtin_types.text,
                 comment='Image URL for this channel (used only in certain image formats).',
                 nullok=True
                 ),
             Column.define(
-                'notes',
-                builtin_types.text,
+                'Notes',
+                builtin_types.markdown,
                 nullok=True
                 ),
             Column.define(
-                'pseudo_color',
+                'Pseudo_Color',
                 builtin_types.color_rgb_hex,
                 nullok=True
                 ),
             Column.define(
-                'is_rgb',
+                'Is_RGB',
                 builtin_types.boolean,
                 nullok=True
                 )
             ]
 
         key_defs = [
-            Key.define(['image', 'channel_number'],
-                       constraint_names=[['isa', 'image_channel_channel_number_key']]
+            Key.define(['Image', 'Channel_Number'],
+                       constraint_names=[['isa', 'Image_Channel_Imagekey1']]
             )
         ]
         fkey_defs = [
-            ForeignKey.define(['image'], 'isa', 'imaging_data', ['RID'],
-                              constraint_names=[['isa', 'image_channel_image_fkey']],
+            ForeignKey.define(['Image'], 'isa', 'Image', ['RID'],
+                              constraint_names=[['isa', 'Image_Channel_Image_fkey']],
                               on_update='CASCADE',
                               on_delete='CASCADE'
             ),
-            ForeignKey.define(['legacy_color'], 'vocab', 'color', ['Name'],
-                              constraint_names=[['isa', 'image_channel_legacy_color_fkey']],
+            ForeignKey.define(['Legacy_Color'], 'vocab', 'color', ['Name'],
+                              constraint_names=[['isa', 'Image_Channel_Legacy_Color_fkey']],
                               on_update='CASCADE',
                               on_delete='NO ACTION'
             )
@@ -316,63 +399,442 @@ def create_image_channel_table(catalog, schema_name):
             key_defs=key_defs,
             fkey_defs=fkey_defs,
             comment=comment,
+            annotations=annotations,
             provide_system=True
         )
         
         schema.create_table(table_def)
         
-def create_image_z_table(catalog, schema_name):
-    table_name = 'image_z'
+def create_image_z_table_if_not_exists(catalog, schema_name):
+    table_name = 'Image_Z'
     comment = 'Table containing metadata related to generated z of multi-channel images. This table is primarily used for exporting OME Tiff.'
     model = catalog.getCatalogModel()
     schema = model.schemas[schema_name]
     if table_name not in schema.tables:
         column_defs = [
             Column.define(
-                'image',
+                'Image',
                 builtin_types.text,
                 comment='The RID of the original image.',                        
                 nullok=False
                 ),
             Column.define(
-                'z_index',
+                'Z_Index',
                 builtin_types.text,
                 nullok=False
                 ),
             Column.define(
-                'ome_companion_url',
+                'OME_Companion_URL',
                 builtin_types.text,
                 comment='File URL of OME-Tiff companion file associated with a specific z plane.',
                 nullok=False
                 ),
             Column.define(
-                'ome_companion_name',
+                'OME_Companion_Name',
                 builtin_types.text,
                 nullok=False
                 ),
             Column.define(
-                'ome_companion_bytes',
+                'OME_Companion_Bytes',
                 builtin_types.int8,
                 nullok=False
                 ),
             Column.define(
-                'ome_companion_md5',
+                'OME_Companion_MD5',
                 builtin_types.text,
                 nullok=False
                 )
             ]
 
         key_defs = [
-            Key.define(['image', 'z_index'],
-                       constraint_names=[['isa', 'image_z_image_z_index_key']]
+            Key.define(['Image', 'Z_Index'],
+                       constraint_names=[['isa', 'Image_Z_Image_Z_Index_key']]
             ),
-            Key.define(['ome_companion_md5'],
-                       constraint_names=[['isa', 'image_z_ome_companion_md5_key']]
+            Key.define(['OME_Companion_MD5'],
+                       constraint_names=[['isa', 'Image_Z_OME_Companion_MD5_key']]
             )
         ]
         fkey_defs = [
-            ForeignKey.define(['image'], 'isa', 'imaging_data', ['RID'],
-                              constraint_names=[['isa', 'image_z_image_fkey']],
+            ForeignKey.define(['Image'], 'isa', 'Image', ['RID'],
+                              constraint_names=[['isa', 'Image_Z_Image_fkey']],
+                              on_update='CASCADE',
+                              on_delete='SET NULL'   
+            )
+        ]
+        table_def = Table.define(
+            table_name,
+            column_defs,
+            key_defs=key_defs,
+            fkey_defs=fkey_defs,
+            annotations={"tag:isrd.isi.edu,2016:generated": None},
+            comment=comment,
+            provide_system=True
+        )
+        
+        schema.create_table(table_def)
+
+def create_image_annotation_file_table_if_not_exists(catalog, schema_name):
+    table_annotations = {
+        "tag:isrd.isi.edu,2016:table-display": {
+          "compact": {
+            "row_order": [
+              {
+                "column": "RMT",
+                "descending": True
+              }
+            ]
+          },
+          "row_name": {
+            "row_markdown_pattern": "[{{{RID}}}](/chaise/record/#{{{$catalog.snapshot}}}/isa:Image_Annotation_File/RID={{{RID}}}): {{{SVG_File_Name}}}"
+          }
+        },
+        "tag:isrd.isi.edu,2016:visible-columns": {
+          "*": [
+            {
+              "source": "RID"
+            },
+            {
+              "source": [
+                {
+                  "outbound": [
+                    "isa",
+                    "Image_Annotation_File_Image_fkey"
+                  ]
+                },
+                "RID"
+              ],
+              "markdown_name": "Image"
+            },
+            {
+              "source": "SVG_File"
+            },
+            {
+              "source": "QuPath_Class_File"
+            },
+            {
+              "source": "Notes"
+            },
+            {
+              "source": "Processing_Status"
+            },
+            {
+              "source": "Processing_Detail"
+            },
+            {
+              "source": [
+                {
+                  "outbound": [
+                    "isa",
+                    "Image_Annotation_File_Curation_Status_fkey"
+                  ]
+                },
+                "RID"
+              ]
+            },
+            {
+              "source": [
+                {
+                  "outbound": [
+                    "isa",
+                    "Image_Annotation_File_Principal_Investigator_fkey"
+                  ]
+                },
+                "RID"
+              ]
+            },
+            {
+              "source": [
+                {
+                  "outbound": [
+                    "isa",
+                    "Image_Annotation_File_Consortium_fkey"
+                  ]
+                },
+                "RID"
+              ]
+            }
+          ],
+          "entry": [
+            {
+              "source": "RID"
+            },
+            {
+              "source": [
+                {
+                  "outbound": [
+                    "isa",
+                    "Image_Annotation_File_Image_Z_Index_fkey"
+                  ]
+                },
+                "RID"
+              ],
+              "markdown_name": "Image"
+            },
+            {
+              "source": "SVG_File"
+            },
+            {
+              "source": "QuPath_Class_File"
+            },
+            {
+              "source": "Notes"
+            },
+            {
+              "source": [
+                {
+                  "outbound": [
+                    "isa",
+                    "Image_Annotation_File_Curation_Status_fkey"
+                  ]
+                },
+                "RID"
+              ]
+            },
+            {
+              "source": [
+                {
+                  "outbound": [
+                    "isa",
+                    "Image_Annotation_File_Principal_Investigator_fkey"
+                  ]
+                },
+                "RID"
+              ]
+            },
+            {
+              "source": [
+                {
+                  "outbound": [
+                    "isa",
+                    "Image_Annotation_File_Consortium_fkey"
+                  ]
+                },
+                "RID"
+              ]
+            }
+          ],
+          "detailed": [
+            {
+              "source": "RID"
+            },
+            {
+              "source": [
+                {
+                  "outbound": [
+                    "isa",
+                    "Image_Annotation_File_Image_fkey"
+                  ]
+                },
+                "RID"
+              ],
+              "markdown_name": "Image"
+            },
+            {
+              "source": "Z_Index"
+            },
+            {
+              "source": "SVG_File"
+            },
+            {
+              "source": "QuPath_Class_File"
+            },
+            {
+              "source": "Notes"
+            },
+            {
+              "source": "Curation_Status"
+            },
+            {
+              "source": "Processing_Status",
+              "display": "{{{Processing_Status}}}{{#if Processing_Detail}}{{{Processing_Detail}}}{{/if}}"
+            },
+            {
+              "source": [
+                {
+                  "outbound": [
+                    "isa",
+                    "Image_Annotation_File_Principal_Investigator_fkey"
+                  ]
+                },
+                "RID"
+              ]
+            },
+            {
+              "source": [
+                {
+                  "outbound": [
+                    "isa",
+                    "Image_Annotation_File_Consortium_fkey"
+                  ]
+                },
+                "RID"
+              ]
+            },
+            {
+              "source": "Release_Date"
+            },
+            {
+              "display": {
+                "template_engine": "handlebars",
+                "markdown_pattern": "{{#if (regexMatch $fkeys.isa.Image_Annotation_File_Image_fkey.values.Download_Tiff_URL \"\\.tif:\" ) }}{{#unless (regexMatch $fkeys.isa.Image_Annotation_File_Image_fkey.values.Download_Tiff_URL \"\\.ome\\.tif:\" ) }} **Preview** of the SVG file over the chosen image (**read only**) \n ::: iframe [{{Image}} (full screen)](/chaise/viewer/#1/isa:Image/RID={{{Image}}}?url=/iiif/2/{{#encode 'https://www.gudmap.org'}}{{/encode}}{{#encode $fkeys.isa.Image_Annotation_File_Image_fkey.values.Download_Tiff_URL}}{{/encode}}/info.json&url={{{SVG_File}}}){width=1500 height=1500 link=/chaise/viewer/#1/isa:Image/id={{{Image}}}?url=/iiif/2/{{#encode 'https://www.gudmap.org'}}{{/encode}}{{#encode $fkeys.isa.Image_Annotation_File_Image_fkey.values.Download_Tiff_URL}}{{/encode}}/info.json&url={{{SVG_File}}} resize=both } \n ::: {{/unless}}{{/if}}"
+              },
+              "markdown_name": "Preview"
+            }
+          ]
+        },
+        "tag:isrd.isi.edu,2016:visible-foreign-keys": {
+          "*": []
+        }
+      }
+    table_name = 'Image_Annotation_File'
+    comment = 'Image annotation file (svg) consisting of multiple groups of overlays associated with different anatomical terms.'
+    model = catalog.getCatalogModel()
+    schema = model.schemas[schema_name]
+    if table_name not in schema.tables:
+        column_defs = [
+            Column.define(
+                'Image',
+                builtin_types.text,
+                comment='The RID of the original image.',                        
+                nullok=False
+                ),
+            Column.define(
+                'Z_Index',
+                builtin_types.int4,
+                nullok=True
+                ),
+            Column.define(
+                'Channels',
+                builtin_types['int4[]'],
+                nullok=True
+                ),
+            Column.define(
+                'SVG_File',
+                builtin_types.text,
+                comment='SVG overlay file',
+                annotations={"tag:isrd.isi.edu,2017:asset": {
+                      "md5": "SVG_File_MD5",
+                      "url_pattern": "/hatrac/facebase/data/fb3/{dataset}/{replicate}/svg",
+                      "filename_column": "SVG_File_Name",
+                      "byte_count_column": "SVG_File_Bytes"
+                    }
+                  },
+                nullok=False
+                ),
+            Column.define(
+                'SVG_File_Name',
+                builtin_types.text,
+                nullok=False
+                ),
+            Column.define(
+                'SVG_File_Bytes',
+                builtin_types.int8,
+                nullok=False
+                ),
+            Column.define(
+                'SVG_File_MD5',
+                builtin_types.text,
+                nullok=False
+                ),
+            Column.define(
+                'QuPath_Class_File',
+                builtin_types.text,
+                comment='QuPath class file ontaining the mapping of colors to class names (i.e. anatomical terms) to be used with the accompanying svg annotation file.',
+                annotations={
+                    "tag:isrd.isi.edu,2017:asset": {
+                      "md5": "QuPath_Class_File_MD5",
+                      "url_pattern": "/hatrac/facebase/data/fb3/{dataset}/{replicate}/qupath/{{{QuPath_Class_File_MD5}}}",
+                      "filename_column": "QuPath_Class_File_Name",
+                      "byte_count_column": "QuPath_Class_File_Bytes"
+                    }
+                  },
+                nullok=True
+                ),
+            Column.define(
+                'QuPath_Class_File_Name',
+                builtin_types.text,
+                nullok=True
+                ),
+            Column.define(
+                'QuPath_Class_File_Bytes',
+                builtin_types.int8,
+                nullok=True
+                ),
+            Column.define(
+                'QuPath_Class_File_MD5',
+                builtin_types.text,
+                nullok=True
+                ),
+            Column.define(
+                'Notes',
+                builtin_types.markdown,
+                nullok=True
+                ),
+            Column.define(
+                'Curation_Status',
+                builtin_types.text,
+                default='In Preparation',
+                nullok=False
+                ),
+            Column.define(
+                'Principal_Investigator',
+                builtin_types.text,
+                nullok=False
+                ),
+            Column.define(
+                'Consortium',
+                builtin_types.text,
+                default='faceBase',
+                nullok=False
+                ),
+            Column.define(
+                'Release_Date',
+                builtin_types.timestamptz,
+                annotations={"tag:isrd.isi.edu,2016:generated": None},
+                nullok=True
+                ),
+            Column.define(
+                'Processing_Status',
+                builtin_types.text,
+                annotations={"tag:isrd.isi.edu,2016:generated": None},
+                nullok=True
+                ),
+            Column.define(
+                'Processing_Detail',
+                builtin_types.markdown,
+                annotations={"tag:isrd.isi.edu,2016:generated": None},
+                nullok=True
+                )
+            ]
+
+        key_defs = [
+            Key.define(['SVG_File_MD5'],
+                       constraint_names=[['isa', 'Image_Annotation_File_SVG_File_MD5_key']]
+            )
+        ]
+        fkey_defs = [
+            ForeignKey.define(['Curation_Status'], 'vocab', 'dataset_status', ['id'],
+                              constraint_names=[['isa', 'Image_Annotation_File_Curation_Status_fkey']],
+                              on_update='CASCADE',
+                              on_delete='SET NULL'   
+            ),
+            ForeignKey.define(['Image', 'Z_Index'], 'isa', 'Image', ['RID', 'Default_Z'],
+                              constraint_names=[['isa', 'Image_Annotation_File_Image_Z_Index_fkey']],
+                              on_update='CASCADE',
+                              on_delete='SET NULL'   
+            ),
+            ForeignKey.define(['Image'], 'isa', 'Image', ['RID'],
+                              constraint_names=[['isa', 'Image_Annotation_File_Image_fkey']],
+                              on_update='CASCADE',
+                              on_delete='SET NULL'   
+            ),
+            ForeignKey.define(['Principal_Investigator'], 'isa', 'person', ['name'],
+                              constraint_names=[['isa', 'Image_Annotation_File_Principal_Investigator_fkey']],
+                              on_update='CASCADE',
+                              on_delete='SET NULL'   
+            ),
+            ForeignKey.define(['Consortium'], 'vocab', 'consortium', ['Name'],
+                              constraint_names=[['isa', 'Image_Annotation_File_Consortium_fkey']],
                               on_update='CASCADE',
                               on_delete='SET NULL'   
             )
@@ -383,6 +845,364 @@ def create_image_z_table(catalog, schema_name):
             key_defs=key_defs,
             fkey_defs=fkey_defs,
             comment=comment,
+            annotations=table_annotations,
+            provide_system=True
+        )
+        
+        schema.create_table(table_def)
+
+def create_image_annotation_table_if_not_exists(catalog, schema_name):
+    table_annotations = {
+        "tag:isrd.isi.edu,2016:table-display": {
+          "compact": {
+            "template_engine": "handlebars",
+            "separator_markdown": "\n",
+            "row_markdown_pattern": "- {{{RID}}}: [{{{$fkeys.isa.Image_Annotation_Anatomy_fkey.values.ID}}}:{{{$fkeys.isa.Image_Annotation_Anatomy_fkey.values.Name}}}](/chaise/record/#{{{$catalog.snapshot}}}/Vocabulary:Anatomy/RID={{{$fkeys.isa.Image_Annotation_Anatomy_fkey.values.RID}}})"
+          }
+        },
+        "tag:isrd.isi.edu,2016:visible-columns": {
+          "*": [
+            {
+              "source": [
+                {
+                  "outbound": [
+                    "isa",
+                    "Image_Annotation_Image_fkey"
+                  ]
+                },
+                "RID"
+              ]
+            },
+            {
+              "source": [
+                {
+                  "outbound": [
+                    "isa",
+                    "Image_Annotation_Anatomy_fkey"
+                  ]
+                },
+                "RID"
+              ]
+            },
+            {
+              "source": "File_URL"
+            },
+            {
+              "source": "Comments"
+            },
+            {
+              "source": [
+                {
+                  "outbound": [
+                    "isa",
+                    "Image_Annotation_Curation_Status_fkey"
+                  ]
+                },
+                "RID"
+              ]
+            },
+            {
+              "source": [
+                {
+                  "outbound": [
+                    "isa",
+                    "Image_Annotation_Principal_Investigator_fkey"
+                  ]
+                },
+                "RID"
+              ]
+            },
+            {
+              "source": [
+                {
+                  "outbound": [
+                    "isa",
+                    "Image_Annotation_Consortium_fkey"
+                  ]
+                },
+                "RID"
+              ]
+            }
+          ],
+          "entry": [
+            {
+              "source": [
+                {
+                  "outbound": [
+                    "isa",
+                    "Image_Annotation_Image_fkey"
+                  ]
+                },
+                "RID"
+              ]
+            },
+            {
+              "source": [
+                {
+                  "outbound": [
+                    "isa",
+                    "Image_Annotation_Anatomy_fkey"
+                  ]
+                },
+                "RID"
+              ]
+            },
+            {
+              "source": "File_URL"
+            },
+            {
+              "source": "Comments"
+            },
+            {
+              "source": [
+                {
+                  "outbound": [
+                    "isa",
+                    "Image_Annotation_Curation_Status_fkey"
+                  ]
+                },
+                "RID"
+              ]
+            },
+            {
+              "source": [
+                {
+                  "outbound": [
+                    "isa",
+                    "Image_Annotation_Principal_Investigator_fkey"
+                  ]
+                },
+                "RID"
+              ]
+            },
+            {
+              "source": [
+                {
+                  "outbound": [
+                    "isa",
+                    "Image_Annotation_Consortium_fkey"
+                  ]
+                },
+                "RID"
+              ]
+            }
+          ],
+          "detailed": [
+            {
+              "source": [
+                {
+                  "outbound": [
+                    "isa",
+                    "Image_Annotation_Image_fkey"
+                  ]
+                },
+                "RID"
+              ]
+            },
+            {
+              "source": [
+                {
+                  "outbound": [
+                    "isa",
+                    "Image_Annotation_Anatomy_fkey"
+                  ]
+                },
+                "RID"
+              ]
+            },
+            {
+              "source": "File_URL"
+            },
+            {
+              "source": "Comments"
+            },
+            {
+              "source": "Z_Index"
+            },
+            {
+              "source": [
+                {
+                  "outbound": [
+                    "isa",
+                    "Image_Annotation_Curation_Status_fkey"
+                  ]
+                },
+                "RID"
+              ]
+            },
+            {
+              "source": [
+                {
+                  "outbound": [
+                    "isa",
+                    "Image_Annotation_Principal_Investigator_fkey"
+                  ]
+                },
+                "RID"
+              ]
+            },
+            {
+              "source": [
+                {
+                  "outbound": [
+                    "isa",
+                    "Image_Annotation_Consortium_fkey"
+                  ]
+                },
+                "RID"
+              ]
+            },
+            {
+              "display": {
+                "template_engine": "handlebars",
+                "markdown_pattern": "{{#if (regexMatch $fkeys.isa.Image_Annotation_Image_fkey.values.Download_Tiff_URL \"\\.tif:\" ) }}{{#unless (regexMatch $fkeys.isa.Image_Annotation_Image_fkey.values.Download_Tiff_URL \"\\.ome\\.tif:\" ) }} **Annotation Display** \n ::: iframe [{{Image}} (full screen)](/chaise/viewer/#1/isa:Image/id={{{Image}}}?url=/iiif/2/{{#encode 'https://www.gudmap.org'}}{{/encode}}{{#encode $fkeys.isa.Image_Annotation_Image_fkey.values.Download_Tiff_URL}}{{/encode}}/info.json&url={{{File_URL}}}){width=1500 height=1500 link=/chaise/viewer/#1/isa:Image/id={{{Image}}}?url=/iiif/2/{{#encode 'https://www.gudmap.org'}}{{/encode}}{{#encode $fkeys.isa.Image_Annotation_Image_fkey.values.Download_Tiff_URL}}{{/encode}}/info.json&url={{{File_URL}}} resize=both } \n ::: {{/unless}}{{/if}}"
+              },
+              "markdown_name": "Display"
+            }
+          ]
+        }
+      }
+    table_name = 'Image_Annotation'
+    comment = 'Anatomical annotations associated with an image.'
+    model = catalog.getCatalogModel()
+    schema = model.schemas[schema_name]
+    if table_name not in schema.tables:
+        column_defs = [
+            Column.define(
+                'Image',
+                builtin_types.text,
+                comment='The RID of the original image.',                        
+                nullok=False
+                ),
+            Column.define(
+                'Anatomy',
+                builtin_types.text,
+                nullok=False
+                ),
+            Column.define(
+                'File_URL',
+                builtin_types.text,
+                comment='File URL of associated annotated overlays.',
+                annotations={
+                    "tag:isrd.isi.edu,2017:asset": {
+                      "md5": "File_MD5",
+                      "url_pattern": "/hatrac/facebase/data/fb3/{dataset}/{replicate}/annotations",
+                      "filename_column": "File_Name",
+                      "byte_count_column": "File_Bytes"
+                    }
+                  },
+                nullok=False
+                ),
+            Column.define(
+                'File_Name',
+                builtin_types.text,
+                nullok=False
+                ),
+            Column.define(
+                'File_Bytes',
+                builtin_types.int8,
+                nullok=False
+                ),
+            Column.define(
+                'File_MD5',
+                builtin_types.text,
+                nullok=False
+                ),
+            Column.define(
+                'Comments',
+                builtin_types.markdown,
+                nullok=True
+                ),
+            Column.define(
+                'Z_Index',
+                builtin_types.int4,
+                nullok=True
+                ),
+            Column.define(
+                'Channels',
+                builtin_types['int4[]'],
+                nullok=True
+                ),
+            Column.define(
+                'Image_Annotation_File',
+                builtin_types.text,
+                nullok=True
+                ),
+            Column.define(
+                'Curation_Status',
+                builtin_types.text,
+                nullok=False
+                ),
+            Column.define(
+                'Principal_Investigator',
+                builtin_types.text,
+                nullok=False
+                ),
+            Column.define(
+                'Consortium',
+                builtin_types.text,
+                nullok=False
+                ),
+            Column.define(
+                'Release_Date',
+                builtin_types.timestamptz,
+                annotations={
+                    "tag:isrd.isi.edu,2016:generated": None
+                  },
+                nullok=True
+                ),
+            ]
+
+        key_defs = [
+            Key.define(['Image', 'Anatomy', 'Z_Index'],
+                       constraint_names=[['isa', 'Image_Annotation_Image_Anatomy_Z_Index_key']]
+            ),
+            Key.define(['Image', 'Anatomy'],
+                       constraint_names=[['isa', 'Image_Annotation_Image_Anatomy_key']]
+            ),
+            Key.define(['File_MD5'],
+                       constraint_names=[['isa', 'Image_Annotation_File_MD5_key']]
+            )
+        ]
+        fkey_defs = [
+            ForeignKey.define(['Anatomy'], 'vocab', 'anatomy', ['id'],
+                              constraint_names=[['vocab', 'Image_Annotation_Anatomy_fkey']],
+                              on_update='CASCADE',
+                              on_delete='SET NULL'   
+            ),
+            ForeignKey.define(['Image'], 'isa', 'Image', ['RID'],
+                              constraint_names=[['isa', 'Image_Annotation_Image_fkey']],
+                              on_update='CASCADE',
+                              on_delete='SET NULL'   
+            ),
+            ForeignKey.define(['Image_Annotation_File'], 'isa', 'Image_Annotation_File', ['RID'],
+                              constraint_names=[['isa', 'Image_Annotation_Image_Annotation_File_fkey']],
+                              on_update='CASCADE',
+                              on_delete='SET NULL'   
+            ),
+            ForeignKey.define(['Curation_Status'], 'vocab', 'dataset_status', ['id'],
+                              constraint_names=[['isa', 'Image_Annotation_Curation_Status_fkey']],
+                              on_update='CASCADE',
+                              on_delete='SET NULL'   
+            ),
+            ForeignKey.define(['Principal_Investigator'], 'isa', 'person', ['name'],
+                              constraint_names=[['isa', 'Image_Annotation_Principal_Investigator_fkey']],
+                              on_update='CASCADE',
+                              on_delete='SET NULL'   
+            ),
+            ForeignKey.define(['Consortium'], 'vocab', 'consortium', ['Name'],
+                              constraint_names=[['isa', 'Image_Annotation_Consortium_fkey']],
+                              on_update='CASCADE',
+                              on_delete='SET NULL'   
+            ),
+        ]
+        table_def = Table.define(
+            table_name,
+            column_defs,
+            key_defs=key_defs,
+            fkey_defs=fkey_defs,
+            comment=comment,
+            annotations=table_annotations,
             provide_system=True
         )
         
@@ -426,36 +1246,527 @@ def add_column_if_not_exist(catalog, schema_name, table_name, column_name, colum
     if column_name not in table.columns.elements:
         table.create_column(Column.define(column_name, builtin_types[column_type], default=default_value, nullok=nullok))
 
-def alter_imaging_data_table(catalog):
-    add_column_if_not_exist(catalog, 'isa', 'imaging_data', 'image_order', 'int4', None, True)
-    add_column_if_not_exist(catalog, 'isa', 'imaging_data', 'notes', 'markdown', None, True)
-    add_column_if_not_exist(catalog, 'isa', 'imaging_data', 'processing_status', 'text', None, True)
-    add_column_if_not_exist(catalog, 'isa', 'imaging_data', 'pixels_per_meter', 'int4', None, True)
-    add_column_if_not_exist(catalog, 'isa', 'imaging_data', 'default_thumbnail_url', 'text', None, True)
-    add_column_if_not_exist(catalog, 'isa', 'imaging_data', 'parent_image', 'text', None, True)
-    add_column_if_not_exist(catalog, 'isa', 'imaging_data', 'default_z', 'int4', None, True)
-    add_column_if_not_exist(catalog, 'isa', 'imaging_data', 'series', 'int4', None, True)
-    add_column_if_not_exist(catalog, 'isa', 'imaging_data', 'download_tiff_url', 'text', None, True)
-    add_column_if_not_exist(catalog, 'isa', 'imaging_data', 'download_tiff_name', 'text', None, True)
-    add_column_if_not_exist(catalog, 'isa', 'imaging_data', 'download_tiff_bytes', 'int8', None, True)
-    add_column_if_not_exist(catalog, 'isa', 'imaging_data', 'download_tiff_md5', 'text', None, True)
-    add_column_if_not_exist(catalog, 'isa', 'imaging_data', 'total_series', 'int4', None, True)
-    add_column_if_not_exist(catalog, 'isa', 'imaging_data', 'metadata_url', 'text', None, True)
-    add_column_if_not_exist(catalog, 'isa', 'imaging_data', 'metadata_name', 'text', None, True)
-    add_column_if_not_exist(catalog, 'isa', 'imaging_data', 'metadata_md5', 'text', None, True)
-    add_column_if_not_exist(catalog, 'isa', 'imaging_data', 'metadata_bytes', 'int8', None, True)
-    add_column_if_not_exist(catalog, 'isa', 'imaging_data', 'ome_xml_url', 'text', None, True)
-    add_column_if_not_exist(catalog, 'isa', 'imaging_data', 'ome_xml_name', 'text', None, True)
-    add_column_if_not_exist(catalog, 'isa', 'imaging_data', 'ome_xml_md5', 'text', None, True)
-    add_column_if_not_exist(catalog, 'isa', 'imaging_data', 'ome_xml_bytes', 'int8', None, True)
-    add_column_if_not_exist(catalog, 'isa', 'imaging_data', 'properties', 'jsonb', None, True)
-    add_column_if_not_exist(catalog, 'isa', 'imaging_data', 'generated_zs', 'int4', None, True)
-    
-    create_primary_key_if_not_exist(catalog, 'isa', 'imaging_data', ['RID', 'default_z'])
-    
-    create_foreign_key_if_not_exist(catalog, 'isa', 'imaging_data', ['processing_status'], 'vocab', 'processing_status', ['Name'], on_update='CASCADE', on_delete='SET NULL')
-    create_foreign_key_if_not_exist(catalog, 'isa', 'imaging_data', ['parent_image'], 'isa', 'imaging_data', ['RID'], on_update='CASCADE', on_delete='CASCADE')
-    
+def create_image_table_if_not_exists(catalog, schema_name):
+    image_url_annotations = {
+        "tag:misd.isi.edu,2015:display": {
+          "name": "Image"
+        },
+        "tag:isrd.isi.edu,2016:column-display": {
+          "*": {
+            "template_engine": "handlebars",
+            "markdown_pattern": "![Image]({{Image_URL}})"
+          }
+        }
+      }
+
+    thumbnail_annotations = {
+        "tag:misd.isi.edu,2015:display": {
+          "name": "Thumbnail"
+        },
+        "tag:isrd.isi.edu,2016:column-display": {
+          "*": {
+            "template_engine": "handlebars",
+            "markdown_pattern": "[![Image]({{#if Thumbnail_URL}}{{Thumbnail_URL}}{{else if Default_Thumbnail_URL}}{{Default_Thumbnail_URL}}{{else}}/facebase-images/click-for-image.png{{/if}}){height=75}](/chaise/record/#{{{$catalog.snapshot}}}/isa:Image/RID={{RID}})"
+          },
+          "name": "Thumbnail (click to view)",
+          "detailed": {
+            "template_engine": "handlebars",
+            "markdown_pattern": "{{#if Thumbnail_URL}}[![Thumbnail]({{{Thumbnail_URL}}}){height=75}]({{{Thumbnail_URL}}}){{else if Default_Thumbnail_URL}}[![Thumbnail]({{{Default_Thumbnail_URL}}}){height=75}]({{{Default_Thumbnail_URL}}}){{/if}}"
+          }
+        }
+      }
+
+    uri_annotations = {
+        "tag:isrd.isi.edu,2016:column-display": {
+          "*": {
+            "template_engine": "handlebars",
+            "markdown_pattern": "{{#if (or uri Generated_Zs)}}::: iframe [](/chaise/viewer/#{{{$catalog.snapshot}}}/isa:Image/RID={{RID}}{{#if $fkeys.isa.Image_Consortium_fkey}}?waterMark={{#encode $fkeys.isa.Image_Consortium_fkey.values.URL}}{{/encode}}{{/if}}{{#if _Pixels_Per_Meter}}&meterScaleInPixels={{_Pixels_Per_Meter}}{{/if}}){style=\"min-width:1000px; min-height:700px; height:80vh;\" class=chaise-autofill  } \n :::{{else if Image_URL}} ![Image]({{Image_URL}}){{/if}}"
+          }
+        }
+      }
+
+    table_annotations = {
+        "tag:isrd.isi.edu,2016:table-display": {
+          "row_name": {
+            "template_engine": "handlebars",
+            "row_markdown_pattern": "{{{RID}}}: {{{Original_File_Name}}}"
+          },
+          "row_name/compact": {
+            "template_engine": "handlebars",
+            "row_markdown_pattern": "[:span:{{{Stage}}} :/span:{.pseudo-column-rowname-thumbnail-title}![]({{#if Thumbnail_URL}}{{{Thumbnail_URL}}}{{else if Default_Thumbnail_URL}}{{{Default_Thumbnail_URL}}}{{else}}/facebase-images/click-for-image.png{{/if}}){height=75}](/chaise/record/#{{{$catalog.snapshot}}}/isa:Image/RID={{{RID}}}){.pseudo-column-rowname-thumbnail-link}"
+          }
+        },
+        "tag:isrd.isi.edu,2016:visible-columns": {
+          "filter": {
+            "and": [
+              {
+                "open": True,
+                "source": [
+                  {
+                    "inbound": [
+                      "isa",
+                      "Image_Annotation_Image_fkey"
+                    ]
+                  },
+                  {
+                    "outbound": [
+                      "isa",
+                      "Image_Annotation_Anatomy_fkey"
+                    ]
+                  },
+                  "RID"
+                ],
+                "markdown_name": "Annotated Anatomy"
+              },
+              {
+                "source": "Original_File_Name",
+                "ux_mode": "choices",
+                "markdown_name": "File Name"
+              },
+              {
+                "source": [
+                  {
+                    "outbound": [
+                      "isa",
+                      "Image_Consortium_fkey"
+                    ]
+                  },
+                  "RID"
+                ]
+              }
+            ]
+          },
+          "compact": [
+            "RID",
+            "Thumbnail_URL",
+            {
+              "sourcekey": "Original_File"
+            },
+            {
+              "sourcekey": "Annotated"
+            },
+            {
+              "sourcekey": "Updated_Notes"
+            }
+          ],
+          "detailed": [
+            "RID",
+            {
+              "sourcekey": "Original_File"
+            },
+            {
+              "source": "Original_File_Bytes",
+              "markdown_name": "File Size (Bytes)"
+            },
+            {
+              "source": "Pixels_Per_Meter"
+            },
+            {
+              "source": "Notes"
+            },
+            [
+              "isa",
+              "Image_Consortium_fkey"
+            ],
+            {
+              "source": "Thumbnail_URL"
+            },
+            {
+              "source": "Default_Z",
+              "markdown_name": "Displayed Z Index"
+            },
+            [
+              "isa",
+              "Image_Channel_Image_fkey"
+            ],
+            {
+              "sourcekey": "Parent_Image_Row"
+            },
+            {
+              "sourcekey": "Derived_Images"
+            },
+            {
+              "source": "Download_Tiff_URL",
+              "markdown_name": "Download Tiff"
+            },
+            {
+              "source": [
+                {
+                  "inbound": [
+                    "isa",
+                    "Image_Annotation_Image_fkey"
+                  ]
+                },
+                {
+                  "outbound": [
+                    "isa",
+                    "Image_Annotation_Principal_Investigator_fkey"
+                  ]
+                },
+                "RID"
+              ],
+              "comment": "PIs associated with annotations created for this image",
+              "display": {
+                "show_foreign_key_link": True
+              },
+              "aggregate": "array_d",
+              "array_display": "csv",
+              "markdown_name": "Image Annotators"
+            },
+            {
+              "source": "uri",
+              "hide_column_header": True
+            }
+          ]
+        },
+        "tag:isrd.isi.edu,2019:source-definitions": {
+          "fkeys": True,
+          "columns": True,
+          "sources": {
+            "Annotated": {
+              "source": [
+                {
+                  "inbound": [
+                    "isa",
+                    "Image_Annotation_Image_fkey"
+                  ]
+                },
+                "RID"
+              ],
+              "comment": "Indicate whether the image has any annotations",
+              "display": {
+                "template_engine": "handlebars",
+                "markdown_pattern": "{{#if (gt $_self 0)}}Yes{{/if}}"
+              },
+              "aggregate": "cnt",
+              "markdown_name": "Annotated"
+            },
+            "Original_File": {
+              "source": "Original_File_URL",
+              "display": {
+                "wait_for": [
+                  "Num_Derived_Images"
+                ],
+                "template_engine": "handlebars",
+                "markdown_pattern": "{{#if Parent_Image}}[{{{Parent_Image_Row.values.Original_File_Name}}} (extracted image {{{Series}}})]({{{Parent_Image_Row.values.Original_File_URL}}}){.download-alt}{{else if (gt Num_Derived_Images 0)}}[{{{Original_File_Name}}} (image set of {{{Num_Derived_Images}}})]({{{Original_File_URL}}}){.download-alt}{{else}}[{{{Original_File_Name}}}]({{{Original_File_URL}}}){.download-alt}{{/if}}"
+              }
+            },
+            "Updated_Notes": {
+              "source": "Notes",
+              "display": {
+                "wait_for": [
+                  "Num_Derived_Images"
+                ],
+                "template_engine": "handlebars",
+                "markdown_pattern": "{{{Notes}}} {{#with $fkey_isa_Image_Parent_Image_Image_RID_fkey}} {{#if Notes}}\n{{/if}} Extracted image {{{../Series}}} (from [{{{values.RID}}}]({{{uri.detailed}}})){{else if (gt _Num_Derived_Images 0) }} {{#if Notes}}\n{{/if}} Image set of {{{Num_Derived_Images}}} {{/with}}"
+              }
+            },
+            "Derived_Images": {
+              "source": [
+                {
+                  "inbound": [
+                    "isa",
+                    "Image_Parent_Image_Image_RID_fkey"
+                  ]
+                },
+                "RID"
+              ],
+              "display": {
+                "template_engine": "handlebars",
+                "markdown_pattern": "The original file contains the following sequence of images. Click an individual image for visualization.\n\n {{#each $self}} [:span: Image {{{this.values.Series}}} :{{{this.values.RID}}} :/span:{.pseudo-column-rowname-thumbnail-title}![]({{#if this.values.Thumbnail_URL}}{{{this.values.Thumbnail_URL}}}{{else if this.values.Default_Thumbnail_URL}}{{{this.values.Default_Thumbnail_URL}}}{{else}}/facebase-images/click-for-image.png{{/if}}){height=150}]({{{this.uri.detailed}}}){.pseudo-column-rowname-thumbnail-link} {{/each}}"
+              },
+              "array_options": {
+                "order": [
+                  {
+                    "column": "Image_Order",
+                    "descending": False
+                  }
+                ]
+              },
+              "markdown_name": "Extracted Images"
+            },
+            "Generated_Tiff": {
+              "source": [
+                {
+                  "inbound": [
+                    "isa",
+                    "Processed_Image_Reference_Image_fkey"
+                  ]
+                },
+                "RID"
+              ],
+              "array_options": {
+                "order": [
+                  {
+                    "column": "Channel_Number",
+                    "descending": False
+                  }
+                ]
+              },
+              "markdown_name": "Download TIFF"
+            },
+            "Parent_Image_Row": {
+              "source": [
+                {
+                  "outbound": [
+                    "isa",
+                    "Image_Parent_Image_Image_RID_fkey"
+                  ]
+                },
+                "RID"
+              ],
+              "display": {
+                "template_engine": "handlebars",
+                "markdown_pattern": "{{#if Parent_Image}}[{{{$self.values.RID}}}]({{{$self.uri.detailed}}}): {{{$self.values.Original_File_Name}}}{{/if}}"
+              },
+              "markdown_name": "Parent Image"
+            },
+            "Num_Derived_Images": {
+              "source": [
+                {
+                  "inbound": [
+                    "isa",
+                    "Image_Parent_Image_Image_RID_fkey"
+                  ]
+                },
+                "RID"
+              ],
+              "aggregate": "cnt",
+              "markdown_name": "Number of Derived Images"
+            }
+          }
+        },
+        "tag:isrd.isi.edu,2016:visible-foreign-keys": {
+          "*": []
+        }
+      }
+ 
+    original_file_url_annotations =  {
+        "tag:isrd.isi.edu,2017:asset": {
+          "browser_upload": False
+        },
+        "tag:misd.isi.edu,2015:display": {
+          "name": "Original File"
+        },
+        "tag:isrd.isi.edu,2018:required": {}
+      }
+
+    table_name = 'Image'
+    comment = None
+    model = catalog.getCatalogModel()
+    schema = model.schemas[schema_name]
+    if table_name not in schema.tables:
+        column_defs = [
+            Column.define(
+                'Thumbnail_URL',
+                builtin_types.text,
+                comment=None, 
+                annotations=thumbnail_annotations,                       
+                nullok=True
+                ),
+            Column.define(
+                'Image_URL',
+                builtin_types.text,
+                annotations=image_url_annotations,
+                nullok=True
+                ),
+            Column.define(
+                'Image_Order',
+                builtin_types.int4,
+                nullok=True
+                ),
+            Column.define(
+                'Consortium',
+                builtin_types.text,
+                nullok=False
+                ),
+            Column.define(
+                'Notes',
+                builtin_types.markdown,
+                nullok=True
+                ),
+            Column.define(
+                'uri',
+                builtin_types.text,
+                annotations=uri_annotations,
+                nullok=True
+                ),
+            Column.define(
+                'Original_File_Name',
+                builtin_types.text,
+                nullok=True
+                ),
+            Column.define(
+                'Original_File_URL',
+                builtin_types.text,
+                annotations=original_file_url_annotations,
+                nullok=True
+                ),
+            Column.define(
+                'Original_File_Bytes',
+                builtin_types.int8,
+                nullok=True
+                ),
+            Column.define(
+                'Original_File_MD5',
+                builtin_types.text,
+                nullok=True
+                ),
+            Column.define(
+                'Stage',
+                builtin_types.text,
+                comment='Specimen stage',
+                nullok=True
+                ),
+            Column.define(
+                'Pixels_Per_Meter',
+                builtin_types.int4,
+                comment='Pixels per meter in image',
+                nullok=True
+                ),
+            Column.define(
+                'Default_Thumbnail_URL',
+                builtin_types.text,
+                nullok=True
+                ),
+            Column.define(
+                'Parent_Image',
+                builtin_types.text,
+                nullok=True
+                ),
+            Column.define(
+                'Default_Z',
+                builtin_types.int4,
+                comment='The default z index (depth) used for visualization',
+                nullok=True
+                ),
+            Column.define(
+                'Series',
+                builtin_types.int4,
+                comment='The series associated with this image in the original multi-image file. Null if the original file is a single image',
+                nullok=True
+                ),
+            Column.define(
+                'Total_Series',
+                builtin_types.int4,
+                comment='The total number of series associated with this image',
+                nullok=True
+                ),
+            Column.define(
+                'Download_Tiff_URL',
+                builtin_types.text,
+                comment='A tiff or ome-tiff image to be used for annotations using third party software such as QuPath. A tiff represents a single channel and single z image. A ome-tiff represents a multi-channels and single z image.',
+                annotations = {
+                    "tag:isrd.isi.edu,2017:asset": {
+                      "browser_upload": False
+                    }
+                  },
+                nullok=True
+                ),
+            Column.define(
+                'Download_Tiff_Name',
+                builtin_types.text,
+                nullok=True
+                ),
+            Column.define(
+                'Download_Tiff_Bytes',
+                builtin_types.int8,
+                nullok=True
+                ),
+            Column.define(
+                'Download_Tiff_MD5',
+                builtin_types.text,
+                nullok=True
+                ),
+            Column.define(
+                'Metadata_URL',
+                builtin_types.text,
+                comment='A succinct OME metadata file (JSON format) derived from the original OME XML metadata',
+                nullok=True
+                ),
+            Column.define(
+                'Metadata_Name',
+                builtin_types.text,
+                nullok=True
+                ),
+            Column.define(
+                'Metadata_Bytes',
+                builtin_types.int8,
+                nullok=True
+                ),
+            Column.define(
+                'Metadata_MD5',
+                builtin_types.text,
+                nullok=True
+                ),
+            Column.define(
+                'OME_XML_URL',
+                builtin_types.text,
+                comment='OME XML metadata file',
+                nullok=True
+                ),
+            Column.define(
+                'OME_XML_Name',
+                builtin_types.text,
+                nullok=True
+                ),
+            Column.define(
+                'OME_XML_Bytes',
+                builtin_types.int8,
+                nullok=True
+                ),
+            Column.define(
+                'OME_XML_MD5',
+                builtin_types.text,
+                nullok=True
+                ),
+            Column.define(
+                'Properties',
+                builtin_types.jsonb,
+                nullok=True
+                ),
+            Column.define(
+                'Generated_Zs',
+                builtin_types.int4,
+                comment='Number of z planes generated from this image.',
+                nullok=True
+                )
+            ]
+
+        key_defs = [
+            Key.define(['RID', 'Default_Z'],
+                       constraint_names=[['isa', 'Image_RID_Default_Z_key']]
+            )
+        ]
+        fkey_defs = [
+            ForeignKey.define(['Parent_Image'], 'isa', 'Image', ['RID'],
+                              constraint_names=[['isa', 'Image_Parent_Image_Image_RID_fkey']],
+                              on_update='CASCADE',
+                              on_delete='CASCADE'   
+            ),
+            ForeignKey.define(['Stage'], 'vocab', 'stage', ['id'],
+                              constraint_names=[['isa', 'Image_Stage_fkey']],
+                              on_update='NO ACTION',
+                              on_delete='NO ACTION'   
+            ),
+            ForeignKey.define(['Consortium'], 'vocab', 'consortium', ['Name'],
+                              constraint_names=[['isa', 'Image_Consortium_fkey']],
+                              on_update='CASCADE',
+                              on_delete='NO ACTION'   
+            )
+        ]
+        table_def = Table.define(
+            table_name,
+            column_defs,
+            key_defs=key_defs,
+            fkey_defs=fkey_defs,
+            comment=comment,
+            annotations=table_annotations,
+            provide_system=True
+        )
+        
+        schema.create_table(table_def)
+
 parser = argparse.ArgumentParser()
 parser.add_argument('hostname')
 parser.add_argument('catalog_number')
@@ -474,30 +1785,67 @@ catalog_ermrest.dcctx['cid'] = 'model'
 """
 Restore the database to the previous status.
 """
+print('Restoring ...')
 restore(catalog_ermrest)
 
 """
 Create new vocabulary tables.
 """
+print('Creating vocabulary tables ...')
 create_vocabulary_table_if_not_exist(catalog_ermrest, 'vocab', 'processing_status', 'A set of status for processing an image.')
 create_vocabulary_table_if_not_exist(catalog_ermrest, 'vocab', 'display_method', 'Table containing controlled names for image display methods.')
 create_vocabulary_table_if_not_exist(catalog_ermrest, 'vocab', 'color', 'Colors and other terms used to describe slide channel appearance.')
+create_vocabulary_table_if_not_exist(catalog_ermrest, 'vocab', 'consortium', 'Consortium.')
 
 """
 Load data into the new vocabulary tables.
 """
+print('Loading the vocabulary tables ...')
 add_rows_to_vocab_processing_status(catalog_ermrest)
 add_rows_to_vocab_display_method(catalog_ermrest)
 add_rows_to_vocab_color(catalog_ermrest)
+add_rows_to_vocab_consortium(catalog_ermrest)
+
+"""
+Create the Image table.
+"""
+print('Creating the Image table ...')
+create_image_table_if_not_exists(catalog_ermrest, 'isa')
 
 """
 Create new tables required for the image processing.
 """
-create_image_z_table(catalog_ermrest, 'isa')
-create_image_channel_table(catalog_ermrest, 'isa')
-create_processed_image_table(catalog_ermrest, 'isa')
+print('Creating the image tables ...')
+create_image_z_table_if_not_exists(catalog_ermrest, 'isa')
+create_image_channel_table_if_not_exists(catalog_ermrest, 'isa')
+create_processed_image_table_if_not_exists(catalog_ermrest, 'isa')
 
 """
-Add new columns, primary keys and foreign keys to the imaging_data table.
+Create the image annotation tables.
 """
-alter_imaging_data_table(catalog_ermrest)
+print('Creating the annotation tables ...')
+create_image_annotation_file_table_if_not_exists(catalog_ermrest, 'isa')
+create_image_annotation_table_if_not_exists(catalog_ermrest, 'isa')
+
+"""
+Add columns to the imaging_data table.
+"""
+print('Adding columns to the imaging_data table ...')
+add_column_if_not_exist(catalog_ermrest, 'isa', 'imaging_data', 'processing_status', 'text', None, True)
+add_column_if_not_exist(catalog_ermrest, 'isa', 'imaging_data', 'image', 'text', None, True)
+
+"""
+Create Foreign Keys.
+"""
+print('Adding FK to the imaging_data table ...')
+create_foreign_key_if_not_exist(catalog_ermrest, 'isa', 'imaging_data', ['processing_status'], 'vocab', 'processing_status', ['Name'])
+create_foreign_key_if_not_exist(catalog_ermrest, 'isa', 'imaging_data', ['image'], 'isa', 'Image', ['RID'])
+
+"""
+Create visible columns annotations.
+"""
+print('Adding the visible columns annotations ...')
+add_annotation(catalog_ermrest, 'isa', 'imaging_data', ['isa', 'imaging_data_image_fkey'])
+
+print('End of schema updates')
+

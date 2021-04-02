@@ -224,16 +224,19 @@ def main():
                 try:
                     deriva_imaging_worker = DerivaImagingWorker(deriva_worker_configuration)
                     returnStatus = deriva_imaging_worker.processImage(args.rid)
-                    print('Return Status: {}'.format(returnStatus))
                     logger.debug('Return Status: {}'.format(returnStatus))
                     return returnStatus
                 except:
+                    et, ev, tb = sys.exc_info()
+                    sys.stderr.write('got exception "%s"' % str(ev))
+                    sys.stderr.write('%s' % ''.join(traceback.format_exception(et, ev, tb)))
+                    sys.stderr.write('\nusage: deriva-imaging-client --config <config-file> --rid <rid>\n\n')
                     return 1
     except:
         et, ev, tb = sys.exc_info()
         sys.stderr.write('got exception "%s"' % str(ev))
         sys.stderr.write('%s' % ''.join(traceback.format_exception(et, ev, tb)))
-        sys.stderr.write('\nusage: env URL=https://foo.org/ermrest/catalog/N deriva_imaging_processing.py --config <config-file>\n\n')
+        sys.stderr.write('\nusage: deriva-imaging-client --config <config-file> --rid <rid>\n\n')
         return 1
 
 
