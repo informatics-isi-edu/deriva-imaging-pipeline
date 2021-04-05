@@ -375,19 +375,20 @@ class DerivaImagingWorker (object):
                                   })
             if returncode != 0:
                 return 1
-        else:
-            """
-            Query for getting the Image record:
-            
-            /entity/{image_schema}:{image_table}/RID=primary_row[{primary_table_image_column}]
-            
-            """
-            url = '/entity/{}:{}/RID={}'.format(urlquote(self.model['image_schema']), urlquote(self.model['image_table']), urlquote(primary_row[self.model['primary_table_image_column']]))
-            self.logger.debug('Query for getting the Image record: "{}"'.format(url)) 
-            resp = self.catalog.get(url)
-            resp.raise_for_status()
-            row = resp.json()[0]
-            image_row = row
+            primary_row[self.model['primary_table_image_column']] = image_rid
+
+        """
+        Query for getting the Image record:
+        
+        /entity/{image_schema}:{image_table}/RID=primary_row[{primary_table_image_column}]
+        
+        """
+        url = '/entity/{}:{}/RID={}'.format(urlquote(self.model['image_schema']), urlquote(self.model['image_table']), urlquote(primary_row[self.model['primary_table_image_column']]))
+        self.logger.debug('Query for getting the Image record: "{}"'.format(url)) 
+        resp = self.catalog.get(url)
+        resp.raise_for_status()
+        row = resp.json()[0]
+        image_row = row
         
         """
         Extract the file from hatrac

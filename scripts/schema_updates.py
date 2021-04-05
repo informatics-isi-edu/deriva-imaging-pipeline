@@ -178,6 +178,31 @@ def create_processed_image_table_if_not_exists(catalog, schema_name):
           "compact": {
             "row_markdown_pattern": "[{{{RID}}}:{{{File_Name}}} ({{{File_Bytes}}} bytes)]({{{File_URL}}}){.download-alt}"
           }
+        },
+        "tag:isrd.isi.edu,2016:visible-columns": {
+          "compact": [
+            "RID",
+            [
+              "Gene_Expression",
+              "Processed_Image_Reference_Image_fkey"
+            ],
+            "File_URL",
+            "Z_Index",
+            "Display_Method",
+            "Channel_Number"
+          ],
+          "detailed": [
+            "RID",
+            [
+              "Gene_Expression",
+              "Processed_Image_Reference_Image_fkey"
+            ],
+            "File_URL",
+            "Config",
+            "Z_Index",
+            "Display_Method",
+            "Channel_Number"
+          ]
         }
       }
 
@@ -209,6 +234,12 @@ def create_processed_image_table_if_not_exists(catalog, schema_name):
                 'File_URL',
                 builtin_types.text,
                 comment='The hatrac location.',
+                annotations={
+                    "tag:isrd.isi.edu,2017:asset": {
+                      "browser_upload": False,
+                      "filename_column": "File_Name"
+                    }
+                  },
                 nullok=True
                 ),
             Column.define(
@@ -318,6 +349,9 @@ def create_image_channel_table_if_not_exists(catalog, schema_name):
             },
             {
               "source": "Notes"
+            },
+            {
+              "source": "Config"
             }
           ]
         }
@@ -373,6 +407,11 @@ def create_image_channel_table_if_not_exists(catalog, schema_name):
                 'Is_RGB',
                 builtin_types.boolean,
                 nullok=True
+                ),
+            Column.define(
+                'Config',
+                builtin_types.jsonb,
+                nullok=True
                 )
             ]
 
@@ -406,6 +445,20 @@ def create_image_channel_table_if_not_exists(catalog, schema_name):
         schema.create_table(table_def)
         
 def create_image_z_table_if_not_exists(catalog, schema_name):
+    annotations = {
+        "tag:isrd.isi.edu,2016:generated": None,
+        "tag:isrd.isi.edu,2016:visible-columns": {
+          "*": [
+            "RID",
+            [
+              "Gene_Expression",
+              "Image_Z_Image_fkey"
+            ],
+            "OME_Companion_URL",
+            "Z_Index"
+          ]
+       }
+    }
     table_name = 'Image_Z'
     comment = 'Table containing metadata related to generated z of multi-channel images. This table is primarily used for exporting OME Tiff.'
     model = catalog.getCatalogModel()
@@ -427,6 +480,12 @@ def create_image_z_table_if_not_exists(catalog, schema_name):
                 'OME_Companion_URL',
                 builtin_types.text,
                 comment='File URL of OME-Tiff companion file associated with a specific z plane.',
+                annotations={
+                    "tag:isrd.isi.edu,2017:asset": {
+                      "browser_upload": False,
+                      "filename_column": "OME_Companion_Name"
+                    }
+                  },
                 nullok=False
                 ),
             Column.define(
@@ -466,7 +525,7 @@ def create_image_z_table_if_not_exists(catalog, schema_name):
             column_defs,
             key_defs=key_defs,
             fkey_defs=fkey_defs,
-            annotations={"tag:isrd.isi.edu,2016:generated": None},
+            annotations=annotations,
             comment=comment,
             provide_system=True
         )
@@ -1297,6 +1356,27 @@ def create_image_table_if_not_exists(catalog, schema_name):
           }
         },
         "tag:isrd.isi.edu,2016:visible-columns": {
+          "entry": [
+            "RID",
+            [
+              "Gene_Expression",
+              "Image_Specimen_denormalize_fkey"
+            ],
+            {
+              "comment": "Type of original uploaded file",
+              "sourcekey": "Media_Types",
+              "markdown_name": "Media Type"
+            },
+            "Original_File_URL",
+            {
+              "source": "Pixels_Per_Meter",
+              "comment": "Number of pixels per meter associated with the image. This data represents pixel to physical scaling information."
+            },
+            "Thumbnail_URL",
+            "Notes",
+            "Release_Date",
+            "Default_Z"
+          ],
           "filter": {
             "and": [
               {

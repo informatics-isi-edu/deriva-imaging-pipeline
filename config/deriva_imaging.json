@@ -18,7 +18,6 @@
     "put_claim_url": "/attributegroup/isa:imaging_data/RID;processing_status",
     "put_update_baseurl": "/attributegroup/isa:imaging_data/RID",
     "deriva_imaging_server": "dev.facebase.org",
-    "host_server": "imaging-dev.gudmap.org",
     "credentials_file": "/home/foo/.deriva/credential.json",
     "catalog_number": "1",
     "hatrac_template": "/hatrac/facebase/data/fb3/{dataset}/{replicate}/proc_img",
