@@ -296,6 +296,7 @@ class DerivaImagingWorker (object):
         row['Original_File_URL'] = primary_row[self.model['primary_file_url']]
         row['Original_File_Bytes'] = primary_row[self.model['primary_file_bytes']]
         row['Original_File_MD5'] = primary_row[self.model['primary_file_md5']]
+        row[self.model['image_table_primary_table_column']] = rid
         row['Consortium'] = 'FaceBase'
         return row
     
@@ -349,9 +350,21 @@ class DerivaImagingWorker (object):
         primary_row = row
         
         """
+        Query for getting the Image record:
+        
+        /entity/{image_schema}:{image_table}/Primary_Table=rid
+        
+        """
+        url = '/entity/{}:{}/{}={}'.format(urlquote(self.model['image_schema']), urlquote(self.model['image_table']), urlquote(self.model['image_table_primary_table_column']), urlquote(rid))
+        self.logger.debug('Query to check if the Image record exists: "{}"'.format(url)) 
+        resp = self.catalog.get(url)
+        resp.raise_for_status()
+        rows = resp.json()
+
+        """
         Create the Image record if necessary
         """
-        if primary_row[self.model['primary_table_image_column']] == None:
+        if len(rows) == 0:
             """
             POST url:
             
@@ -363,27 +376,14 @@ class DerivaImagingWorker (object):
             image_rid = self.createRecord(url, image_row, rid)
             if image_rid == None:
                 return 1
-            """
-            update the primary table with the image value
-            """
-            returncode = self.updateAttributes(self.model['image_schema'],
-                                  self.model['primary_table'],
-                                  rid,
-                                  [self.model['primary_table_image_column']],
-                                  {'RID': rid,
-                                  self.model['primary_table_image_column']: image_rid
-                                  })
-            if returncode != 0:
-                return 1
-            primary_row[self.model['primary_table_image_column']] = image_rid
 
         """
         Query for getting the Image record:
         
-        /entity/{image_schema}:{image_table}/RID=primary_row[{primary_table_image_column}]
+        /entity/{image_schema}:{image_table}/Primary_Table=rid]
         
         """
-        url = '/entity/{}:{}/RID={}'.format(urlquote(self.model['image_schema']), urlquote(self.model['image_table']), urlquote(primary_row[self.model['primary_table_image_column']]))
+        url = '/entity/{}:{}/{}={}'.format(urlquote(self.model['image_schema']), urlquote(self.model['image_table']), urlquote(self.model['image_table_primary_table_column']), urlquote(rid))
         self.logger.debug('Query for getting the Image record: "{}"'.format(url)) 
         resp = self.catalog.get(url)
         resp.raise_for_status()

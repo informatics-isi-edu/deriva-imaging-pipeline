@@ -21,9 +21,9 @@ def add_annotation(catalog, schema_name, table_name, value):
     schema = model.schemas[schema_name]
     if table_name in schema.tables:
         table = schema.tables[table_name]
-        visible_columns = table.annotations['tag:isrd.isi.edu,2016:visible-columns']['detailed']
-        if value not in visible_columns:
-            visible_columns.append(value)
+        visible_foreign_keys = table.annotations['tag:isrd.isi.edu,2016:visible-foreign-keys']['detailed']
+        if value not in visible_foreign_keys:
+            visible_foreign_keys.append(value)
             print('Applying annotations ...')
             model.apply()
             return
@@ -33,12 +33,12 @@ def drop_annotation(catalog, schema_name, table_name, value):
     schema = model.schemas[schema_name]
     if table_name in schema.tables:
         table = schema.tables[table_name]
-        visible_columns = table.annotations['tag:isrd.isi.edu,2016:visible-columns']['detailed']
-        if value in visible_columns:
+        visible_foreign_keys = table.annotations['tag:isrd.isi.edu,2016:visible-foreign-keys']['detailed']
+        if value in visible_foreign_keys:
             i = 0
-            for visible_column in visible_columns:
-                if visible_column == value:
-                    del visible_columns[i]
+            for visible_foreign_key in visible_foreign_keys:
+                if visible_foreign_key == value:
+                    del visible_foreign_keys[i]
                     model.apply()
                     print('Dropping annotations ...')
                     return
@@ -89,7 +89,7 @@ def drop_table_if_exist(catalog, schema_name, table_name):
 Restore the database to the previous status.
 """
 def restore(catalog):
-    drop_annotation(catalog, 'isa', 'imaging_data', ['isa', 'imaging_data_image_fkey'])
+    drop_annotation(catalog, 'isa', 'imaging_data', ['isa', 'Image_Primary_Table_imaging_data_RID_fkey'])
 
     drop_foreign_key_if_exist(catalog, 'isa', 'imaging_data', ['image'])
     drop_foreign_key_if_exist(catalog, 'isa', 'imaging_data', ['processing_status'])
@@ -1715,6 +1715,11 @@ def create_image_table_if_not_exists(catalog, schema_name):
                 nullok=True
                 ),
             Column.define(
+                'Primary_Table',
+                builtin_types.text,
+                nullok=True
+                ),
+            Column.define(
                 'Default_Z',
                 builtin_types.int4,
                 comment='The default z index (depth) used for visualization',
@@ -1824,6 +1829,11 @@ def create_image_table_if_not_exists(catalog, schema_name):
                               on_update='CASCADE',
                               on_delete='CASCADE'   
             ),
+            ForeignKey.define(['Primary_Table'], 'isa', 'imaging_data', ['RID'],
+                              constraint_names=[['isa', 'Image_Primary_Table_imaging_data_RID_fkey']],
+                              on_update='CASCADE',
+                              on_delete='CASCADE'   
+            ),
             ForeignKey.define(['Stage'], 'vocab', 'stage', ['id'],
                               constraint_names=[['isa', 'Image_Stage_fkey']],
                               on_update='NO ACTION',
@@ -1912,20 +1922,20 @@ Add columns to the imaging_data table.
 """
 print('Adding columns to the imaging_data table ...')
 add_column_if_not_exist(catalog_ermrest, 'isa', 'imaging_data', 'processing_status', 'text', None, True)
-add_column_if_not_exist(catalog_ermrest, 'isa', 'imaging_data', 'image', 'text', None, True)
+#add_column_if_not_exist(catalog_ermrest, 'isa', 'imaging_data', 'image', 'text', None, True)
 
 """
 Create Foreign Keys.
 """
 print('Adding FK to the imaging_data table ...')
 create_foreign_key_if_not_exist(catalog_ermrest, 'isa', 'imaging_data', ['processing_status'], 'vocab', 'processing_status', ['Name'])
-create_foreign_key_if_not_exist(catalog_ermrest, 'isa', 'imaging_data', ['image'], 'isa', 'Image', ['RID'])
+#create_foreign_key_if_not_exist(catalog_ermrest, 'isa', 'imaging_data', ['image'], 'isa', 'Image', ['RID'])
 
 """
 Create visible columns annotations.
 """
 print('Adding the visible columns annotations ...')
-add_annotation(catalog_ermrest, 'isa', 'imaging_data', ['isa', 'imaging_data_image_fkey'])
+add_annotation(catalog_ermrest, 'isa', 'imaging_data', ['isa', 'Image_Primary_Table_imaging_data_RID_fkey'])
 
 print('End of schema updates')
 
