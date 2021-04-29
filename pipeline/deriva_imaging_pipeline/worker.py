@@ -557,7 +557,7 @@ class DerivaImagingWorker (object):
     Namespace: /facebase/data/fb3/{dataset}/{replicate}/proc_img/{RID}/<filename>
     """
     def getThumbnailHatracURL(self, thumbnail_pattern, converted_file_name, rid):
-        hatrac_uri = 'https://{}{}/{}/{}'.format(self.host, self.hatrac_prefix, urlquote(rid), urlquote(converted_file_name))
+        hatrac_uri = '{}/{}/{}'.format(self.hatrac_prefix, urlquote(rid), urlquote(converted_file_name))
         return thumbnail_pattern % (urlquote(hatrac_uri))
     
     """
@@ -1034,7 +1034,7 @@ class DerivaImagingWorker (object):
                    }
             
             pyramid['row'] = row
-            pyramid['url'] = '/iiif/2/{}/info.json'.format(urlquote('https://{}{}'.format(self.host, hatrac_URI)))
+            pyramid['url'] = '/iiif/2/{}/info.json'.format(urlquote('{}'.format(hatrac_URI)))
             thumbnail_pattern = self.getThumbnailPattern()
             thumbnail_url = self.getThumbnailHatracURL(thumbnail_pattern, pyramid['name'], rid)
             pyramid['Default_Thumbnail_URL'] = thumbnail_url

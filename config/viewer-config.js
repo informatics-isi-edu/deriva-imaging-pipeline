@@ -77,7 +77,7 @@ var viewerConfigs = {
             // how to generate the url
             "iiif_version": "2", // if not passed, `2` will be used
             "image_url_pattern": {
-                "iiif": "/iiif/{{{iiif_version}}}/{{#encode url}}{{/encode}}/info.json"
+                "iiif": "/iiif/{{{iiif_version}}}/{{#encode _url}}{{/encode}}/info.json"
             }
         },
         /**
