@@ -13,7 +13,7 @@ import argparse
 import json
 import sys
 from deriva.core import ErmrestCatalog, get_credential
-from deriva.core.ermrest_model import builtin_types, Table, Key, ForeignKey, Column
+from deriva.core.ermrest_model import builtin_types, Table, Schema, Key, ForeignKey, Column
 from deriva.core.ermrest_model import tag as chaise_tags
 
 def add_annotation(catalog, schema_name, table_name, value):
@@ -24,7 +24,7 @@ def add_annotation(catalog, schema_name, table_name, value):
         visible_foreign_keys = table.annotations['tag:isrd.isi.edu,2016:visible-foreign-keys']['detailed']
         if value not in visible_foreign_keys:
             visible_foreign_keys.append(value)
-            print('Applying annotations ...')
+            print('Applying visible-foreign-keys annotation: {}'.format(value))
             model.apply()
             return
     
@@ -40,7 +40,7 @@ def drop_annotation(catalog, schema_name, table_name, value):
                 if visible_foreign_key == value:
                     del visible_foreign_keys[i]
                     model.apply()
-                    print('Dropping annotations ...')
+                    print('Dropping visible-foreign-keys annotation: {}'.format(value))
                     return
                 else:
                     i +=1
@@ -69,6 +69,7 @@ def drop_foreign_key_if_exist(catalog, schema_name, table_name, foreign_key_colu
         fk = None
     
     if fk != None:
+        print('Dropping Foreign Key: {} of table {}:{}'.format(constraint_name, schema_name, table_name))
         fk.drop()
 
 def drop_column_if_exist(catalog, schema_name, table_name, column_name):
@@ -77,37 +78,45 @@ def drop_column_if_exist(catalog, schema_name, table_name, column_name):
     table = schema.tables[table_name]
     if column_name in table.columns.elements:
         column = table.column_definitions.__getitem__(column_name)
+        print('Dropping column: {} of table {}:{}'.format(column_name, schema_name, table_name))
         column.drop()
 
 def drop_table_if_exist(catalog, schema_name, table_name):
     model = catalog.getCatalogModel()
     schema = model.schemas[schema_name]
     if table_name in schema.tables.keys():
+        print('Dropping table {}:{}'.format(schema_name, table_name))
         schema.tables[table_name].drop()
+
+def drop_schema_if_exist(catalog, schema_name):
+    model = catalog.getCatalogModel()
+    if schema_name in model.schemas:
+        schema = model.schemas[schema_name]
+        print('Dropping schema {}'.format(schema_name))
+        schema.drop()
 
 """
 Restore the database to the previous status.
 """
 def restore(catalog):
-    drop_annotation(catalog, 'isa', 'imaging_data', ['isa', 'Image_Primary_Table_imaging_data_RID_fkey'])
+    drop_annotation(catalog, 'isa', 'imaging_data', ['Imaging', 'Image_Primary_Table_imaging_data_RID_fkey'])
 
-    drop_foreign_key_if_exist(catalog, 'isa', 'imaging_data', ['image'])
     drop_foreign_key_if_exist(catalog, 'isa', 'imaging_data', ['processing_status'])
     
-    drop_column_if_exist(catalog, 'isa', 'imaging_data', 'image')
     drop_column_if_exist(catalog, 'isa', 'imaging_data', 'processing_status')
     
-    drop_table_if_exist(catalog, 'isa', 'Image_Annotation')
-    drop_table_if_exist(catalog, 'isa', 'Image_Annotation_File')
-    drop_table_if_exist(catalog, 'isa', 'Processed_Image')
-    drop_table_if_exist(catalog, 'isa', 'Image_Channel')
-    drop_table_if_exist(catalog, 'isa', 'Image_Z')
-    drop_table_if_exist(catalog, 'isa', 'Image')
+    drop_table_if_exist(catalog, 'Imaging', 'Image_Annotation')
+    drop_table_if_exist(catalog, 'Imaging', 'Image_Annotation_File')
+    drop_table_if_exist(catalog, 'Imaging', 'Processed_Image')
+    drop_table_if_exist(catalog, 'Imaging', 'Image_Channel')
+    drop_table_if_exist(catalog, 'Imaging', 'Image_Z')
+    drop_table_if_exist(catalog, 'Imaging', 'Image')
 
     drop_table_if_exist(catalog, 'vocab', 'color')
     drop_table_if_exist(catalog, 'vocab', 'display_method')
     drop_table_if_exist(catalog, 'vocab', 'processing_status')
     drop_table_if_exist(catalog, 'vocab', 'consortium')
+    drop_schema_if_exist(catalog, 'Imaging')
 
 def create_vocabulary_table_if_not_exist(catalog, schema_name, table_name, comment):
     model = catalog.getCatalogModel()
@@ -281,22 +290,22 @@ def create_processed_image_table_if_not_exists(catalog, schema_name):
 
         key_defs = [
             Key.define(['Reference_Image', 'Channel_Number', 'Z_Index'],
-                       constraint_names=[['isa', 'Processed_Image_Reference_Image_Channel_Number_Z_Index_key']]
+                       constraint_names=[['Imaging', 'Processed_Image_Reference_Image_Channel_Number_Z_Index_key']]
             )
         ]
         fkey_defs = [
             ForeignKey.define(['Display_Method'], 'vocab', 'display_method', ['Name'],
-                              constraint_names=[['isa', 'Processed_Image_Display_Method_fkey']],
+                              constraint_names=[['Imaging', 'Processed_Image_Display_Method_fkey']],
                               on_update='CASCADE',
                               on_delete='NO ACTION'   
             ),
-            ForeignKey.define(['Reference_Image', 'Channel_Number'], 'isa', 'Image_Channel', ['Image', 'Channel_Number'],
-                              constraint_names=[['isa', 'Processed_Image_Reference_Image_Channel_Number_fkey']],
+            ForeignKey.define(['Reference_Image', 'Channel_Number'], 'Imaging', 'Image_Channel', ['Image', 'Channel_Number'],
+                              constraint_names=[['Imaging', 'Processed_Image_Reference_Image_Channel_Number_fkey']],
                               on_update='CASCADE',
                               on_delete='NO ACTION'
             ),
-            ForeignKey.define(['Reference_Image'], 'isa', 'Image', ['RID'],
-                              constraint_names=[['isa', 'Processed_Image_Reference_Image_fkey']],
+            ForeignKey.define(['Reference_Image'], 'Imaging', 'Image', ['RID'],
+                              constraint_names=[['Imaging', 'Processed_Image_Reference_Image_fkey']],
                               on_update='NO ACTION',
                               on_delete='CASCADE'   
             )
@@ -330,7 +339,7 @@ def create_image_channel_table_if_not_exists(catalog, schema_name):
               "source": [
                 {
                   "outbound": [
-                    "isa",
+                    'Imaging',
                     "Image_Channel_Image_fkey"
                   ]
                 },
@@ -417,17 +426,17 @@ def create_image_channel_table_if_not_exists(catalog, schema_name):
 
         key_defs = [
             Key.define(['Image', 'Channel_Number'],
-                       constraint_names=[['isa', 'Image_Channel_Imagekey1']]
+                       constraint_names=[['Imaging', 'Image_Channel_Imagekey1']]
             )
         ]
         fkey_defs = [
-            ForeignKey.define(['Image'], 'isa', 'Image', ['RID'],
-                              constraint_names=[['isa', 'Image_Channel_Image_fkey']],
+            ForeignKey.define(['Image'], 'Imaging', 'Image', ['RID'],
+                              constraint_names=[['Imaging', 'Image_Channel_Image_fkey']],
                               on_update='CASCADE',
                               on_delete='CASCADE'
             ),
             ForeignKey.define(['Legacy_Color'], 'vocab', 'color', ['Name'],
-                              constraint_names=[['isa', 'Image_Channel_Legacy_Color_fkey']],
+                              constraint_names=[['Imaging', 'Image_Channel_Legacy_Color_fkey']],
                               on_update='CASCADE',
                               on_delete='NO ACTION'
             )
@@ -507,15 +516,15 @@ def create_image_z_table_if_not_exists(catalog, schema_name):
 
         key_defs = [
             Key.define(['Image', 'Z_Index'],
-                       constraint_names=[['isa', 'Image_Z_Image_Z_Index_key']]
+                       constraint_names=[['Imaging', 'Image_Z_Image_Z_Index_key']]
             ),
             Key.define(['OME_Companion_MD5'],
-                       constraint_names=[['isa', 'Image_Z_OME_Companion_MD5_key']]
+                       constraint_names=[['Imaging', 'Image_Z_OME_Companion_MD5_key']]
             )
         ]
         fkey_defs = [
-            ForeignKey.define(['Image'], 'isa', 'Image', ['RID'],
-                              constraint_names=[['isa', 'Image_Z_Image_fkey']],
+            ForeignKey.define(['Image'], 'Imaging', 'Image', ['RID'],
+                              constraint_names=[['Imaging', 'Image_Z_Image_fkey']],
                               on_update='CASCADE',
                               on_delete='SET NULL'   
             )
@@ -544,7 +553,7 @@ def create_image_annotation_file_table_if_not_exists(catalog, schema_name):
             ]
           },
           "row_name": {
-            "row_markdown_pattern": "[{{{RID}}}](/chaise/record/#{{{$catalog.snapshot}}}/isa:Image_Annotation_File/RID={{{RID}}}): {{{SVG_File_Name}}}"
+            "row_markdown_pattern": "[{{{RID}}}](/chaise/record/#{{{$catalog.snapshot}}}/Imaging:Image_Annotation_File/RID={{{RID}}}): {{{SVG_File_Name}}}"
           }
         },
         "tag:isrd.isi.edu,2016:visible-columns": {
@@ -556,7 +565,7 @@ def create_image_annotation_file_table_if_not_exists(catalog, schema_name):
               "source": [
                 {
                   "outbound": [
-                    "isa",
+                    "Imaging",
                     "Image_Annotation_File_Image_fkey"
                   ]
                 },
@@ -583,7 +592,7 @@ def create_image_annotation_file_table_if_not_exists(catalog, schema_name):
               "source": [
                 {
                   "outbound": [
-                    "isa",
+                    "Imaging",
                     "Image_Annotation_File_Curation_Status_fkey"
                   ]
                 },
@@ -594,7 +603,7 @@ def create_image_annotation_file_table_if_not_exists(catalog, schema_name):
               "source": [
                 {
                   "outbound": [
-                    "isa",
+                    "Imaging",
                     "Image_Annotation_File_Principal_Investigator_fkey"
                   ]
                 },
@@ -605,7 +614,7 @@ def create_image_annotation_file_table_if_not_exists(catalog, schema_name):
               "source": [
                 {
                   "outbound": [
-                    "isa",
+                    "Imaging",
                     "Image_Annotation_File_Consortium_fkey"
                   ]
                 },
@@ -621,7 +630,7 @@ def create_image_annotation_file_table_if_not_exists(catalog, schema_name):
               "source": [
                 {
                   "outbound": [
-                    "isa",
+                    "Imaging",
                     "Image_Annotation_File_Image_Z_Index_fkey"
                   ]
                 },
@@ -642,7 +651,7 @@ def create_image_annotation_file_table_if_not_exists(catalog, schema_name):
               "source": [
                 {
                   "outbound": [
-                    "isa",
+                    "Imaging",
                     "Image_Annotation_File_Curation_Status_fkey"
                   ]
                 },
@@ -653,7 +662,7 @@ def create_image_annotation_file_table_if_not_exists(catalog, schema_name):
               "source": [
                 {
                   "outbound": [
-                    "isa",
+                    "Imaging",
                     "Image_Annotation_File_Principal_Investigator_fkey"
                   ]
                 },
@@ -664,7 +673,7 @@ def create_image_annotation_file_table_if_not_exists(catalog, schema_name):
               "source": [
                 {
                   "outbound": [
-                    "isa",
+                    "Imaging",
                     "Image_Annotation_File_Consortium_fkey"
                   ]
                 },
@@ -680,7 +689,7 @@ def create_image_annotation_file_table_if_not_exists(catalog, schema_name):
               "source": [
                 {
                   "outbound": [
-                    "isa",
+                    "Imaging",
                     "Image_Annotation_File_Image_fkey"
                   ]
                 },
@@ -711,7 +720,7 @@ def create_image_annotation_file_table_if_not_exists(catalog, schema_name):
               "source": [
                 {
                   "outbound": [
-                    "isa",
+                    "Imaging",
                     "Image_Annotation_File_Principal_Investigator_fkey"
                   ]
                 },
@@ -722,7 +731,7 @@ def create_image_annotation_file_table_if_not_exists(catalog, schema_name):
               "source": [
                 {
                   "outbound": [
-                    "isa",
+                    "Imaging",
                     "Image_Annotation_File_Consortium_fkey"
                   ]
                 },
@@ -735,7 +744,7 @@ def create_image_annotation_file_table_if_not_exists(catalog, schema_name):
             {
               "display": {
                 "template_engine": "handlebars",
-                "markdown_pattern": "{{#if (regexMatch $fkeys.isa.Image_Annotation_File_Image_fkey.values.Download_Tiff_URL \"\\.tif:\" ) }}{{#unless (regexMatch $fkeys.isa.Image_Annotation_File_Image_fkey.values.Download_Tiff_URL \"\\.ome\\.tif:\" ) }} **Preview** of the SVG file over the chosen image (**read only**) \n ::: iframe [{{Image}} (full screen)](/chaise/viewer/#1/isa:Image/RID={{{Image}}}?url=/iiif/2/{{#encode 'https://www.gudmap.org'}}{{/encode}}{{#encode $fkeys.isa.Image_Annotation_File_Image_fkey.values.Download_Tiff_URL}}{{/encode}}/info.json&url={{{SVG_File}}}){width=1500 height=1500 link=/chaise/viewer/#1/isa:Image/id={{{Image}}}?url=/iiif/2/{{#encode 'https://www.gudmap.org'}}{{/encode}}{{#encode $fkeys.isa.Image_Annotation_File_Image_fkey.values.Download_Tiff_URL}}{{/encode}}/info.json&url={{{SVG_File}}} resize=both } \n ::: {{/unless}}{{/if}}"
+                "markdown_pattern": "{{#if (regexMatch $fkeys.Imaging.Image_Annotation_File_Image_fkey.values.Download_Tiff_URL \"\\.tif:\" ) }}{{#unless (regexMatch $fkeys.Imaging.Image_Annotation_File_Image_fkey.values.Download_Tiff_URL \"\\.ome\\.tif:\" ) }} **Preview** of the SVG file over the chosen image (**read only**) \n ::: iframe [{{Image}} (full screen)](/chaise/viewer/#1/Imaging:Image/RID={{{Image}}}?url=/iiif/2/{{#encode 'https://www.gudmap.org'}}{{/encode}}{{#encode $fkeys.Imaging.Image_Annotation_File_Image_fkey.values.Download_Tiff_URL}}{{/encode}}/info.json&url={{{SVG_File}}}){width=1500 height=1500 link=/chaise/viewer/#1/Imaging:Image/id={{{Image}}}?url=/iiif/2/{{#encode 'https://www.gudmap.org'}}{{/encode}}{{#encode $fkeys.Imaging.Image_Annotation_File_Image_fkey.values.Download_Tiff_URL}}{{/encode}}/info.json&url={{{SVG_File}}} resize=both } \n ::: {{/unless}}{{/if}}"
               },
               "markdown_name": "Preview"
             }
@@ -868,32 +877,32 @@ def create_image_annotation_file_table_if_not_exists(catalog, schema_name):
 
         key_defs = [
             Key.define(['SVG_File_MD5'],
-                       constraint_names=[['isa', 'Image_Annotation_File_SVG_File_MD5_key']]
+                       constraint_names=[['Imaging', 'Image_Annotation_File_SVG_File_MD5_key']]
             )
         ]
         fkey_defs = [
             ForeignKey.define(['Curation_Status'], 'vocab', 'dataset_status', ['id'],
-                              constraint_names=[['isa', 'Image_Annotation_File_Curation_Status_fkey']],
+                              constraint_names=[['Imaging', 'Image_Annotation_File_Curation_Status_fkey']],
                               on_update='CASCADE',
                               on_delete='SET NULL'   
             ),
-            ForeignKey.define(['Image', 'Z_Index'], 'isa', 'Image', ['RID', 'Default_Z'],
-                              constraint_names=[['isa', 'Image_Annotation_File_Image_Z_Index_fkey']],
+            ForeignKey.define(['Image', 'Z_Index'], 'Imaging', 'Image', ['RID', 'Default_Z'],
+                              constraint_names=[['Imaging', 'Image_Annotation_File_Image_Z_Index_fkey']],
                               on_update='CASCADE',
                               on_delete='SET NULL'   
             ),
-            ForeignKey.define(['Image'], 'isa', 'Image', ['RID'],
-                              constraint_names=[['isa', 'Image_Annotation_File_Image_fkey']],
+            ForeignKey.define(['Image'], 'Imaging', 'Image', ['RID'],
+                              constraint_names=[['Imaging', 'Image_Annotation_File_Image_fkey']],
                               on_update='CASCADE',
                               on_delete='SET NULL'   
             ),
             ForeignKey.define(['Principal_Investigator'], 'isa', 'person', ['name'],
-                              constraint_names=[['isa', 'Image_Annotation_File_Principal_Investigator_fkey']],
+                              constraint_names=[['Imaging', 'Image_Annotation_File_Principal_Investigator_fkey']],
                               on_update='CASCADE',
                               on_delete='SET NULL'   
             ),
             ForeignKey.define(['Consortium'], 'vocab', 'consortium', ['Name'],
-                              constraint_names=[['isa', 'Image_Annotation_File_Consortium_fkey']],
+                              constraint_names=[['Imaging', 'Image_Annotation_File_Consortium_fkey']],
                               on_update='CASCADE',
                               on_delete='SET NULL'   
             )
@@ -916,7 +925,7 @@ def create_image_annotation_table_if_not_exists(catalog, schema_name):
           "compact": {
             "template_engine": "handlebars",
             "separator_markdown": "\n",
-            "row_markdown_pattern": "- {{{RID}}}: [{{{$fkeys.isa.Image_Annotation_Anatomy_fkey.values.ID}}}:{{{$fkeys.isa.Image_Annotation_Anatomy_fkey.values.Name}}}](/chaise/record/#{{{$catalog.snapshot}}}/Vocabulary:Anatomy/RID={{{$fkeys.isa.Image_Annotation_Anatomy_fkey.values.RID}}})"
+            "row_markdown_pattern": "- {{{RID}}}: [{{{$fkeys.Imaging.Image_Annotation_Anatomy_fkey.values.ID}}}:{{{$fkeys.Imaging.Image_Annotation_Anatomy_fkey.values.Name}}}](/chaise/record/#{{{$catalog.snapshot}}}/Vocabulary:Anatomy/RID={{{$fkeys.Imaging.Image_Annotation_Anatomy_fkey.values.RID}}})"
           }
         },
         "tag:isrd.isi.edu,2016:visible-columns": {
@@ -925,7 +934,7 @@ def create_image_annotation_table_if_not_exists(catalog, schema_name):
               "source": [
                 {
                   "outbound": [
-                    "isa",
+                    "Imaging",
                     "Image_Annotation_Image_fkey"
                   ]
                 },
@@ -936,7 +945,7 @@ def create_image_annotation_table_if_not_exists(catalog, schema_name):
               "source": [
                 {
                   "outbound": [
-                    "isa",
+                    "Imaging",
                     "Image_Annotation_Anatomy_fkey"
                   ]
                 },
@@ -953,7 +962,7 @@ def create_image_annotation_table_if_not_exists(catalog, schema_name):
               "source": [
                 {
                   "outbound": [
-                    "isa",
+                    "Imaging",
                     "Image_Annotation_Curation_Status_fkey"
                   ]
                 },
@@ -964,7 +973,7 @@ def create_image_annotation_table_if_not_exists(catalog, schema_name):
               "source": [
                 {
                   "outbound": [
-                    "isa",
+                    "Imaging",
                     "Image_Annotation_Principal_Investigator_fkey"
                   ]
                 },
@@ -975,7 +984,7 @@ def create_image_annotation_table_if_not_exists(catalog, schema_name):
               "source": [
                 {
                   "outbound": [
-                    "isa",
+                    "Imaging",
                     "Image_Annotation_Consortium_fkey"
                   ]
                 },
@@ -988,7 +997,7 @@ def create_image_annotation_table_if_not_exists(catalog, schema_name):
               "source": [
                 {
                   "outbound": [
-                    "isa",
+                    "Imaging",
                     "Image_Annotation_Image_fkey"
                   ]
                 },
@@ -999,7 +1008,7 @@ def create_image_annotation_table_if_not_exists(catalog, schema_name):
               "source": [
                 {
                   "outbound": [
-                    "isa",
+                    "Imaging",
                     "Image_Annotation_Anatomy_fkey"
                   ]
                 },
@@ -1016,7 +1025,7 @@ def create_image_annotation_table_if_not_exists(catalog, schema_name):
               "source": [
                 {
                   "outbound": [
-                    "isa",
+                    "Imaging",
                     "Image_Annotation_Curation_Status_fkey"
                   ]
                 },
@@ -1027,7 +1036,7 @@ def create_image_annotation_table_if_not_exists(catalog, schema_name):
               "source": [
                 {
                   "outbound": [
-                    "isa",
+                    "Imaging",
                     "Image_Annotation_Principal_Investigator_fkey"
                   ]
                 },
@@ -1038,7 +1047,7 @@ def create_image_annotation_table_if_not_exists(catalog, schema_name):
               "source": [
                 {
                   "outbound": [
-                    "isa",
+                    "Imaging",
                     "Image_Annotation_Consortium_fkey"
                   ]
                 },
@@ -1051,7 +1060,7 @@ def create_image_annotation_table_if_not_exists(catalog, schema_name):
               "source": [
                 {
                   "outbound": [
-                    "isa",
+                    "Imaging",
                     "Image_Annotation_Image_fkey"
                   ]
                 },
@@ -1062,7 +1071,7 @@ def create_image_annotation_table_if_not_exists(catalog, schema_name):
               "source": [
                 {
                   "outbound": [
-                    "isa",
+                    "Imaging",
                     "Image_Annotation_Anatomy_fkey"
                   ]
                 },
@@ -1082,7 +1091,7 @@ def create_image_annotation_table_if_not_exists(catalog, schema_name):
               "source": [
                 {
                   "outbound": [
-                    "isa",
+                    "Imaging",
                     "Image_Annotation_Curation_Status_fkey"
                   ]
                 },
@@ -1093,7 +1102,7 @@ def create_image_annotation_table_if_not_exists(catalog, schema_name):
               "source": [
                 {
                   "outbound": [
-                    "isa",
+                    "Imaging",
                     "Image_Annotation_Principal_Investigator_fkey"
                   ]
                 },
@@ -1104,7 +1113,7 @@ def create_image_annotation_table_if_not_exists(catalog, schema_name):
               "source": [
                 {
                   "outbound": [
-                    "isa",
+                    "Imaging",
                     "Image_Annotation_Consortium_fkey"
                   ]
                 },
@@ -1114,7 +1123,7 @@ def create_image_annotation_table_if_not_exists(catalog, schema_name):
             {
               "display": {
                 "template_engine": "handlebars",
-                "markdown_pattern": "{{#if (regexMatch $fkeys.isa.Image_Annotation_Image_fkey.values.Download_Tiff_URL \"\\.tif:\" ) }}{{#unless (regexMatch $fkeys.isa.Image_Annotation_Image_fkey.values.Download_Tiff_URL \"\\.ome\\.tif:\" ) }} **Annotation Display** \n ::: iframe [{{Image}} (full screen)](/chaise/viewer/#1/isa:Image/id={{{Image}}}?url=/iiif/2/{{#encode 'https://www.gudmap.org'}}{{/encode}}{{#encode $fkeys.isa.Image_Annotation_Image_fkey.values.Download_Tiff_URL}}{{/encode}}/info.json&url={{{File_URL}}}){width=1500 height=1500 link=/chaise/viewer/#1/isa:Image/id={{{Image}}}?url=/iiif/2/{{#encode 'https://www.gudmap.org'}}{{/encode}}{{#encode $fkeys.isa.Image_Annotation_Image_fkey.values.Download_Tiff_URL}}{{/encode}}/info.json&url={{{File_URL}}} resize=both } \n ::: {{/unless}}{{/if}}"
+                "markdown_pattern": "{{#if (regexMatch $fkeys.Imaging.Image_Annotation_Image_fkey.values.Download_Tiff_URL \"\\.tif:\" ) }}{{#unless (regexMatch $fkeys.Imaging.Image_Annotation_Image_fkey.values.Download_Tiff_URL \"\\.ome\\.tif:\" ) }} **Annotation Display** \n ::: iframe [{{Image}} (full screen)](/chaise/viewer/#1/Imaging:Image/id={{{Image}}}?url=/iiif/2/{{#encode 'https://www.gudmap.org'}}{{/encode}}{{#encode $fkeys.Imaging.Image_Annotation_Image_fkey.values.Download_Tiff_URL}}{{/encode}}/info.json&url={{{File_URL}}}){width=1500 height=1500 link=/chaise/viewer/#1/Imaging:Image/id={{{Image}}}?url=/iiif/2/{{#encode 'https://www.gudmap.org'}}{{/encode}}{{#encode $fkeys.Imaging.Image_Annotation_Image_fkey.values.Download_Tiff_URL}}{{/encode}}/info.json&url={{{File_URL}}} resize=both } \n ::: {{/unless}}{{/if}}"
               },
               "markdown_name": "Display"
             }
@@ -1214,43 +1223,43 @@ def create_image_annotation_table_if_not_exists(catalog, schema_name):
 
         key_defs = [
             Key.define(['Image', 'Anatomy', 'Z_Index'],
-                       constraint_names=[['isa', 'Image_Annotation_Image_Anatomy_Z_Index_key']]
+                       constraint_names=[['Imaging', 'Image_Annotation_Image_Anatomy_Z_Index_key']]
             ),
             Key.define(['Image', 'Anatomy'],
-                       constraint_names=[['isa', 'Image_Annotation_Image_Anatomy_key']]
+                       constraint_names=[['Imaging', 'Image_Annotation_Image_Anatomy_key']]
             ),
             Key.define(['File_MD5'],
-                       constraint_names=[['isa', 'Image_Annotation_File_MD5_key']]
+                       constraint_names=[['Imaging', 'Image_Annotation_File_MD5_key']]
             )
         ]
         fkey_defs = [
             ForeignKey.define(['Anatomy'], 'vocab', 'anatomy', ['id'],
-                              constraint_names=[['vocab', 'Image_Annotation_Anatomy_fkey']],
+                              constraint_names=[['Imaging', 'Image_Annotation_Anatomy_fkey']],
                               on_update='CASCADE',
                               on_delete='SET NULL'   
             ),
-            ForeignKey.define(['Image'], 'isa', 'Image', ['RID'],
-                              constraint_names=[['isa', 'Image_Annotation_Image_fkey']],
+            ForeignKey.define(['Image'], 'Imaging', 'Image', ['RID'],
+                              constraint_names=[['Imaging', 'Image_Annotation_Image_fkey']],
                               on_update='CASCADE',
                               on_delete='SET NULL'   
             ),
-            ForeignKey.define(['Image_Annotation_File'], 'isa', 'Image_Annotation_File', ['RID'],
-                              constraint_names=[['isa', 'Image_Annotation_Image_Annotation_File_fkey']],
+            ForeignKey.define(['Image_Annotation_File'], 'Imaging', 'Image_Annotation_File', ['RID'],
+                              constraint_names=[['Imaging', 'Image_Annotation_Image_Annotation_File_fkey']],
                               on_update='CASCADE',
                               on_delete='SET NULL'   
             ),
             ForeignKey.define(['Curation_Status'], 'vocab', 'dataset_status', ['id'],
-                              constraint_names=[['isa', 'Image_Annotation_Curation_Status_fkey']],
+                              constraint_names=[['Imaging', 'Image_Annotation_Curation_Status_fkey']],
                               on_update='CASCADE',
                               on_delete='SET NULL'   
             ),
             ForeignKey.define(['Principal_Investigator'], 'isa', 'person', ['name'],
-                              constraint_names=[['isa', 'Image_Annotation_Principal_Investigator_fkey']],
+                              constraint_names=[['Imaging', 'Image_Annotation_Principal_Investigator_fkey']],
                               on_update='CASCADE',
                               on_delete='SET NULL'   
             ),
             ForeignKey.define(['Consortium'], 'vocab', 'consortium', ['Name'],
-                              constraint_names=[['isa', 'Image_Annotation_Consortium_fkey']],
+                              constraint_names=[['Imaging', 'Image_Annotation_Consortium_fkey']],
                               on_update='CASCADE',
                               on_delete='SET NULL'   
             ),
@@ -1325,7 +1334,7 @@ def create_image_table_if_not_exists(catalog, schema_name):
         "tag:isrd.isi.edu,2016:column-display": {
           "*": {
             "template_engine": "handlebars",
-            "markdown_pattern": "[![Image]({{#if Thumbnail_URL}}{{Thumbnail_URL}}{{else if Default_Thumbnail_URL}}{{Default_Thumbnail_URL}}{{else}}/facebase-images/click-for-image.png{{/if}}){height=75}](/chaise/record/#{{{$catalog.snapshot}}}/isa:Image/RID={{RID}})"
+            "markdown_pattern": "[![Image]({{#if Thumbnail_URL}}{{Thumbnail_URL}}{{else if Default_Thumbnail_URL}}{{Default_Thumbnail_URL}}{{else}}/facebase-images/click-for-image.png{{/if}}){height=75}](/chaise/record/#{{{$catalog.snapshot}}}/Imaging:Image/RID={{RID}})"
           },
           "name": "Thumbnail (click to view)",
           "detailed": {
@@ -1339,7 +1348,7 @@ def create_image_table_if_not_exists(catalog, schema_name):
         "tag:isrd.isi.edu,2016:column-display": {
           "*": {
             "template_engine": "handlebars",
-            "markdown_pattern": "{{#if (or uri Generated_Zs)}}::: iframe [](/chaise/viewer/#{{{$catalog.snapshot}}}/isa:Image/RID={{RID}}{{#if $fkeys.isa.Image_Consortium_fkey}}?waterMark={{#encode $fkeys.isa.Image_Consortium_fkey.values.URL}}{{/encode}}{{/if}}{{#if _Pixels_Per_Meter}}&meterScaleInPixels={{_Pixels_Per_Meter}}{{/if}}){style=\"min-width:1000px; min-height:700px; height:80vh;\" class=chaise-autofill  } \n :::{{else if Image_URL}} ![Image]({{Image_URL}}){{/if}}"
+            "markdown_pattern": "{{#if (or uri Generated_Zs)}}::: iframe [](/chaise/viewer/#{{{$catalog.snapshot}}}/Imaging:Image/RID={{RID}}{{#if $fkeys.Imaging.Image_Consortium_fkey}}?waterMark={{#encode $fkeys.Imaging.Image_Consortium_fkey.values.URL}}{{/encode}}{{/if}}{{#if _Pixels_Per_Meter}}&meterScaleInPixels={{_Pixels_Per_Meter}}{{/if}}){style=\"min-width:1000px; min-height:700px; height:80vh;\" class=chaise-autofill  } \n :::{{else if Image_URL}} ![Image]({{Image_URL}}){{/if}}"
           }
         }
       }
@@ -1352,7 +1361,7 @@ def create_image_table_if_not_exists(catalog, schema_name):
           },
           "row_name/compact": {
             "template_engine": "handlebars",
-            "row_markdown_pattern": "[:span:{{{Stage}}} :/span:{.pseudo-column-rowname-thumbnail-title}![]({{#if Thumbnail_URL}}{{{Thumbnail_URL}}}{{else if Default_Thumbnail_URL}}{{{Default_Thumbnail_URL}}}{{else}}/facebase-images/click-for-image.png{{/if}}){height=75}](/chaise/record/#{{{$catalog.snapshot}}}/isa:Image/RID={{{RID}}}){.pseudo-column-rowname-thumbnail-link}"
+            "row_markdown_pattern": "[:span:{{{Stage}}} :/span:{.pseudo-column-rowname-thumbnail-title}![]({{#if Thumbnail_URL}}{{{Thumbnail_URL}}}{{else if Default_Thumbnail_URL}}{{{Default_Thumbnail_URL}}}{{else}}/facebase-images/click-for-image.png{{/if}}){height=75}](/chaise/record/#{{{$catalog.snapshot}}}/Imaging:Image/RID={{{RID}}}){.pseudo-column-rowname-thumbnail-link}"
           }
         },
         "tag:isrd.isi.edu,2016:visible-columns": {
@@ -1384,13 +1393,13 @@ def create_image_table_if_not_exists(catalog, schema_name):
                 "source": [
                   {
                     "inbound": [
-                      "isa",
+                      "Imaging",
                       "Image_Annotation_Image_fkey"
                     ]
                   },
                   {
                     "outbound": [
-                      "isa",
+                      "Imaging",
                       "Image_Annotation_Anatomy_fkey"
                     ]
                   },
@@ -1407,7 +1416,7 @@ def create_image_table_if_not_exists(catalog, schema_name):
                 "source": [
                   {
                     "outbound": [
-                      "isa",
+                      "Imaging",
                       "Image_Consortium_fkey"
                     ]
                   },
@@ -1445,7 +1454,7 @@ def create_image_table_if_not_exists(catalog, schema_name):
               "source": "Notes"
             },
             [
-              "isa",
+              "Imaging",
               "Image_Consortium_fkey"
             ],
             {
@@ -1456,7 +1465,7 @@ def create_image_table_if_not_exists(catalog, schema_name):
               "markdown_name": "Displayed Z Index"
             },
             [
-              "isa",
+              "Imaging",
               "Image_Channel_Image_fkey"
             ],
             {
@@ -1473,13 +1482,13 @@ def create_image_table_if_not_exists(catalog, schema_name):
               "source": [
                 {
                   "inbound": [
-                    "isa",
+                    "Imaging",
                     "Image_Annotation_Image_fkey"
                   ]
                 },
                 {
                   "outbound": [
-                    "isa",
+                    "Imaging",
                     "Image_Annotation_Principal_Investigator_fkey"
                   ]
                 },
@@ -1507,7 +1516,7 @@ def create_image_table_if_not_exists(catalog, schema_name):
               "source": [
                 {
                   "inbound": [
-                    "isa",
+                    "Imaging",
                     "Image_Annotation_Image_fkey"
                   ]
                 },
@@ -1538,14 +1547,14 @@ def create_image_table_if_not_exists(catalog, schema_name):
                   "Num_Derived_Images"
                 ],
                 "template_engine": "handlebars",
-                "markdown_pattern": "{{{Notes}}} {{#with $fkey_isa_Image_Parent_Image_Image_RID_fkey}} {{#if Notes}}\n{{/if}} Extracted image {{{../Series}}} (from [{{{values.RID}}}]({{{uri.detailed}}})){{else if (gt _Num_Derived_Images 0) }} {{#if Notes}}\n{{/if}} Image set of {{{Num_Derived_Images}}} {{/with}}"
+                "markdown_pattern": "{{{Notes}}} {{#with $fkey_Imaging_Image_Parent_Image_Image_RID_fkey}} {{#if Notes}}\n{{/if}} Extracted image {{{../Series}}} (from [{{{values.RID}}}]({{{uri.detailed}}})){{else if (gt _Num_Derived_Images 0) }} {{#if Notes}}\n{{/if}} Image set of {{{Num_Derived_Images}}} {{/with}}"
               }
             },
             "Derived_Images": {
               "source": [
                 {
                   "inbound": [
-                    "isa",
+                    "Imaging",
                     "Image_Parent_Image_Image_RID_fkey"
                   ]
                 },
@@ -1569,7 +1578,7 @@ def create_image_table_if_not_exists(catalog, schema_name):
               "source": [
                 {
                   "inbound": [
-                    "isa",
+                    "Imaging",
                     "Processed_Image_Reference_Image_fkey"
                   ]
                 },
@@ -1589,7 +1598,7 @@ def create_image_table_if_not_exists(catalog, schema_name):
               "source": [
                 {
                   "outbound": [
-                    "isa",
+                    "Imaging",
                     "Image_Parent_Image_Image_RID_fkey"
                   ]
                 },
@@ -1605,7 +1614,7 @@ def create_image_table_if_not_exists(catalog, schema_name):
               "source": [
                 {
                   "inbound": [
-                    "isa",
+                    "Imaging",
                     "Image_Parent_Image_Image_RID_fkey"
                   ]
                 },
@@ -1820,27 +1829,27 @@ def create_image_table_if_not_exists(catalog, schema_name):
 
         key_defs = [
             Key.define(['RID', 'Default_Z'],
-                       constraint_names=[['isa', 'Image_RID_Default_Z_key']]
+                       constraint_names=[['Imaging', 'Image_RID_Default_Z_key']]
             )
         ]
         fkey_defs = [
-            ForeignKey.define(['Parent_Image'], 'isa', 'Image', ['RID'],
-                              constraint_names=[['isa', 'Image_Parent_Image_Image_RID_fkey']],
+            ForeignKey.define(['Parent_Image'], 'Imaging', 'Image', ['RID'],
+                              constraint_names=[['Imaging', 'Image_Parent_Image_Image_RID_fkey']],
                               on_update='CASCADE',
                               on_delete='CASCADE'   
             ),
             ForeignKey.define(['Primary_Table'], 'isa', 'imaging_data', ['RID'],
-                              constraint_names=[['isa', 'Image_Primary_Table_imaging_data_RID_fkey']],
+                              constraint_names=[['Imaging', 'Image_Primary_Table_imaging_data_RID_fkey']],
                               on_update='CASCADE',
                               on_delete='CASCADE'   
             ),
             ForeignKey.define(['Stage'], 'vocab', 'stage', ['id'],
-                              constraint_names=[['isa', 'Image_Stage_fkey']],
+                              constraint_names=[['Imaging', 'Image_Stage_fkey']],
                               on_update='NO ACTION',
                               on_delete='NO ACTION'   
             ),
             ForeignKey.define(['Consortium'], 'vocab', 'consortium', ['Name'],
-                              constraint_names=[['isa', 'Image_Consortium_fkey']],
+                              constraint_names=[['Imaging', 'Image_Consortium_fkey']],
                               on_update='CASCADE',
                               on_delete='NO ACTION'   
             )
@@ -1856,6 +1865,45 @@ def create_image_table_if_not_exists(catalog, schema_name):
         )
         
         schema.create_table(table_def)
+
+def create_Imaging_schema_if_not_exists(catalog):
+    annotations = {
+        "tag:misd.isi.edu,2015:display": {
+          "name_style": {
+            "title_case": True,
+            "underline_space": True
+          }
+        }
+    }
+    
+    acls = {
+      "delete": [
+        "https://auth.globus.org/8438a12e-6589-11e7-9091-22000b500e8d",
+        "https://dev.facebase.org/webauthn_robot/fb_cron",
+        "https://staging.facebase.org/webauthn_robot/fb_cron",
+        "https://www.facebase.org/webauthn_robot/fb_cron"
+      ],
+      "insert": [
+        "https://www.facebase.org/webauthn_robot/fb_cron",
+        "https://auth.globus.org/8438a12e-6589-11e7-9091-22000b500e8d",
+        "https://dev.facebase.org/webauthn_robot/fb_cron",
+        "https://staging.facebase.org/webauthn_robot/fb_cron",
+        "https://auth.globus.org/01c7bf28-2622-11e7-9ad7-22000b74c0b7"
+      ],
+      "update": [
+        "https://auth.globus.org/8438a12e-6589-11e7-9091-22000b500e8d",
+        "https://dev.facebase.org/webauthn_robot/fb_cron",
+        "https://staging.facebase.org/webauthn_robot/fb_cron",
+        "https://www.facebase.org/webauthn_robot/fb_cron"
+      ]
+    }
+
+
+    schema_name = 'Imaging'
+    model = catalog.getCatalogModel()
+    if schema_name not in model.schemas:
+        schema_def = Schema.define(schema_name, acls=acls, annotations=annotations)
+        model.create_schema(schema_def)
 
 parser = argparse.ArgumentParser()
 parser.add_argument('hostname')
@@ -1897,45 +1945,49 @@ add_rows_to_vocab_color(catalog_ermrest)
 add_rows_to_vocab_consortium(catalog_ermrest)
 
 """
+Create the Imaging schema.
+"""
+print('Creating the Imaging schema ...')
+create_Imaging_schema_if_not_exists(catalog_ermrest)
+
+"""
 Create the Image table.
 """
 print('Creating the Image table ...')
-create_image_table_if_not_exists(catalog_ermrest, 'isa')
+create_image_table_if_not_exists(catalog_ermrest, 'Imaging')
 
 """
 Create new tables required for the image processing.
 """
 print('Creating the image tables ...')
-create_image_z_table_if_not_exists(catalog_ermrest, 'isa')
-create_image_channel_table_if_not_exists(catalog_ermrest, 'isa')
-create_processed_image_table_if_not_exists(catalog_ermrest, 'isa')
+create_image_z_table_if_not_exists(catalog_ermrest, 'Imaging')
+create_image_channel_table_if_not_exists(catalog_ermrest, 'Imaging')
+create_processed_image_table_if_not_exists(catalog_ermrest, 'Imaging')
 
 """
 Create the image annotation tables.
 """
 print('Creating the annotation tables ...')
-create_image_annotation_file_table_if_not_exists(catalog_ermrest, 'isa')
-create_image_annotation_table_if_not_exists(catalog_ermrest, 'isa')
+create_image_annotation_file_table_if_not_exists(catalog_ermrest, 'Imaging')
+create_image_annotation_table_if_not_exists(catalog_ermrest, 'Imaging')
 
 """
 Add columns to the imaging_data table.
 """
 print('Adding columns to the imaging_data table ...')
 add_column_if_not_exist(catalog_ermrest, 'isa', 'imaging_data', 'processing_status', 'text', None, True)
-#add_column_if_not_exist(catalog_ermrest, 'isa', 'imaging_data', 'image', 'text', None, True)
 
 """
 Create Foreign Keys.
 """
 print('Adding FK to the imaging_data table ...')
 create_foreign_key_if_not_exist(catalog_ermrest, 'isa', 'imaging_data', ['processing_status'], 'vocab', 'processing_status', ['Name'])
-#create_foreign_key_if_not_exist(catalog_ermrest, 'isa', 'imaging_data', ['image'], 'isa', 'Image', ['RID'])
 
 """
 Create visible columns annotations.
 """
 print('Adding the visible columns annotations ...')
-add_annotation(catalog_ermrest, 'isa', 'imaging_data', ['isa', 'Image_Primary_Table_imaging_data_RID_fkey'])
+add_annotation(catalog_ermrest, 'isa', 'imaging_data', ['Imaging', 'Image_Primary_Table_imaging_data_RID_fkey'])
 
 print('End of schema updates')
 

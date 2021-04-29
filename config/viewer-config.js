@@ -49,7 +49,7 @@ var viewerConfigs = {
          */
         "processed_image": {
             // procesed image table
-            "schema_name": "isa",
+            "schema_name": "Imaging",
             "table_name": "Processed_Image",
 
             // how to sort the processed_image records
@@ -85,7 +85,7 @@ var viewerConfigs = {
          */
         "image_channel": {
             // channel table
-            "schema_name": "isa",
+            "schema_name": "Imaging",
             "table_name": "Image_Channel",
 
             // the sort criteria
@@ -120,7 +120,7 @@ var viewerConfigs = {
          */
         "image_annotation": {
             // annotation table
-            "schema_name": "isa",
+            "schema_name": "Imaging",
             "table_name": "Image_Annotation",
 
             // fk to image table in annotation table
@@ -143,7 +143,7 @@ var viewerConfigs = {
             "annotated_term_displayname": "Anatomy",
             "annotated_term_column_name": "Anatomy",
             "annotated_term_visible_column_name": "3HIyfQyg2efVSZ9KzxjQzQ",
-            "annotated_term_foreign_key_constraint": ["isa", "Image_Annotation_Anatomy_fkey"],
+            "annotated_term_foreign_key_constraint": ["Imaging", "Image_Annotation_Anatomy_fkey"],
 
             /**
              * annoated term table

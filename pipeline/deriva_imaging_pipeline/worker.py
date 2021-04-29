@@ -296,7 +296,7 @@ class DerivaImagingWorker (object):
         row['Original_File_URL'] = primary_row[self.model['primary_file_url']]
         row['Original_File_Bytes'] = primary_row[self.model['primary_file_bytes']]
         row['Original_File_MD5'] = primary_row[self.model['primary_file_md5']]
-        row[self.model['image_table_primary_table_column']] = rid
+        row['Primary_Table'] = rid
         row['Consortium'] = 'FaceBase'
         return row
     
@@ -335,10 +335,10 @@ class DerivaImagingWorker (object):
         """
         Query for detecting the image to be processed:
         
-        /entity/{image_schema}:{primary_table}/RID={rid}
+        /entity/{primary_schema}:{primary_table}/RID={rid}
         
         """
-        url = '/entity/{}:{}/RID={}'.format(urlquote(self.model['image_schema']), urlquote(self.model['primary_table']), urlquote(rid))
+        url = '/entity/{}:{}/RID={}'.format(urlquote(self.model['primary_schema']), urlquote(self.model['primary_table']), urlquote(rid))
         self.logger.debug('Primary table query URL: "{}"'.format(url)) 
         
         resp = self.catalog.get(url)
@@ -355,7 +355,7 @@ class DerivaImagingWorker (object):
         /entity/{image_schema}:{image_table}/Primary_Table=rid
         
         """
-        url = '/entity/{}:{}/{}={}'.format(urlquote(self.model['image_schema']), urlquote(self.model['image_table']), urlquote(self.model['image_table_primary_table_column']), urlquote(rid))
+        url = '/entity/{}:{}/Primary_Table={}'.format(urlquote(self.model['image_schema']), urlquote(self.model['image_table']), urlquote(rid))
         self.logger.debug('Query to check if the Image record exists: "{}"'.format(url)) 
         resp = self.catalog.get(url)
         resp.raise_for_status()
@@ -383,7 +383,7 @@ class DerivaImagingWorker (object):
         /entity/{image_schema}:{image_table}/Primary_Table=rid]
         
         """
-        url = '/entity/{}:{}/{}={}'.format(urlquote(self.model['image_schema']), urlquote(self.model['image_table']), urlquote(self.model['image_table_primary_table_column']), urlquote(rid))
+        url = '/entity/{}:{}/Primary_Table={}'.format(urlquote(self.model['image_schema']), urlquote(self.model['image_table']), urlquote(rid))
         self.logger.debug('Query for getting the Image record: "{}"'.format(url)) 
         resp = self.catalog.get(url)
         resp.raise_for_status()
@@ -400,7 +400,7 @@ class DerivaImagingWorker (object):
             Update the image table with the failure result.
             """
             
-            self.updateAttributes(self.model['image_schema'],
+            self.updateAttributes(self.model['primary_schema'],
                                   self.model['primary_table'],
                                   rid,
                                   [self.model['processing_status']],
@@ -423,7 +423,7 @@ class DerivaImagingWorker (object):
             """
             Update the image table with the failure result.
             """
-            self.updateAttributes(self.model['image_schema'],
+            self.updateAttributes(self.model['primary_schema'],
                                   self.model['primary_table'],
                                   rid,
                                   [self.model['processing_status']],
@@ -463,7 +463,7 @@ class DerivaImagingWorker (object):
             """
             Update the image table with the failure result.
             """
-            self.updateAttributes(self.model['image_schema'],
+            self.updateAttributes(self.model['primary_schema'],
                                   self.model['primary_table'],
                                   rid,
                                   [self.model['processing_status']],
@@ -482,7 +482,7 @@ class DerivaImagingWorker (object):
             """
             Update the image table with the failure result.
             """
-            self.updateAttributes(self.model['image_schema'],
+            self.updateAttributes(self.model['primary_schema'],
                                   self.model['primary_table'],
                                   rid,
                                   [self.model['processing_status']],
@@ -504,7 +504,7 @@ class DerivaImagingWorker (object):
             Update the image table with the failure result.
             """
             self.removeConvertedFiles()
-            self.updateAttributes(self.model['image_schema'],
+            self.updateAttributes(self.model['primary_schema'],
                                  self.model['primary_table'],
                                  rid,
                                  [self.model['processing_status']],
@@ -523,7 +523,7 @@ class DerivaImagingWorker (object):
         obj[self.model['processing_status']] = 'MISSING_SCENES_WARNING' if self.missing_scenes == True else 'success'
         columns = [self.model['processing_status']]
 
-        self.updateAttributes(self.model['image_schema'],
+        self.updateAttributes(self.model['primary_schema'],
                               self.model['primary_table'],
                               rid,
                               columns,
@@ -531,7 +531,7 @@ class DerivaImagingWorker (object):
         
         self.logger.debug('SUCCEEDED created the tiled pyramid images for the file "%s".' % (filename)) 
         
-        self.logger.debug('Ended Image Processing for the {};{} table.'.format(self.model['image_schema'], self.model['primary_table'])) 
+        self.logger.debug('Ended Image Processing for the {};{} table.'.format(self.model['primary_schema'], self.model['primary_table'])) 
         
         return 0
         
