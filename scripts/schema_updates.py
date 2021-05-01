@@ -1231,12 +1231,12 @@ def create_image_table_if_not_exists(catalog, schema_name):
         "tag:isrd.isi.edu,2016:column-display": {
           "*": {
             "template_engine": "handlebars",
-            "markdown_pattern": "[![Image]({{#if Thumbnail_URL}}{{Thumbnail_URL}}{{else if Default_Thumbnail_URL}}{{Default_Thumbnail_URL}}{{else}}/facebase-images/click-for-image.png{{/if}}){height=75}](/chaise/record/#{{{$catalog.snapshot}}}/Imaging:Image/RID={{RID}})"
+            "markdown_pattern": "[![Image]({{#if Thumbnail_URL}}{{Thumbnail_URL}}{{else}}/facebase-images/click-for-image.png{{/if}}){height=75}](/chaise/record/#{{{$catalog.snapshot}}}/Imaging:Image/RID={{RID}})"
           },
           "name": "Thumbnail (click to view)",
           "detailed": {
             "template_engine": "handlebars",
-            "markdown_pattern": "{{#if Thumbnail_URL}}[![Thumbnail]({{{Thumbnail_URL}}}){height=75}]({{{Thumbnail_URL}}}){{else if Default_Thumbnail_URL}}[![Thumbnail]({{{Default_Thumbnail_URL}}}){height=75}]({{{Default_Thumbnail_URL}}}){{/if}}"
+            "markdown_pattern": "{{#if Thumbnail_URL}}[![Thumbnail]({{{Thumbnail_URL}}}){height=75}]({{{Thumbnail_URL}}}){{/if}}"
           }
         }
       }
@@ -1258,7 +1258,7 @@ def create_image_table_if_not_exists(catalog, schema_name):
           },
           "row_name/compact": {
             "template_engine": "handlebars",
-            "row_markdown_pattern": "[:span: :/span:{.pseudo-column-rowname-thumbnail-title}![]({{#if Thumbnail_URL}}{{{Thumbnail_URL}}}{{else if Default_Thumbnail_URL}}{{{Default_Thumbnail_URL}}}{{else}}/facebase-images/click-for-image.png{{/if}}){height=75}](/chaise/record/#{{{$catalog.snapshot}}}/Imaging:Image/RID={{{RID}}}){.pseudo-column-rowname-thumbnail-link}"
+            "row_markdown_pattern": "[:span: :/span:{.pseudo-column-rowname-thumbnail-title}![]({{#if Thumbnail_URL}}{{{Thumbnail_URL}}}{{else}}/facebase-images/click-for-image.png{{/if}}){height=75}](/chaise/record/#{{{$catalog.snapshot}}}/Imaging:Image/RID={{{RID}}}){.pseudo-column-rowname-thumbnail-link}"
           }
         },
         "tag:isrd.isi.edu,2016:visible-columns": {
@@ -1427,7 +1427,7 @@ def create_image_table_if_not_exists(catalog, schema_name):
               ],
               "display": {
                 "template_engine": "handlebars",
-                "markdown_pattern": "The original file contains the following sequence of images. Click an individual image for visualization.\n\n {{#each $self}} [:span: Image {{{this.values.Series}}} :{{{this.values.RID}}} :/span:{.pseudo-column-rowname-thumbnail-title}![]({{#if this.values.Thumbnail_URL}}{{{this.values.Thumbnail_URL}}}{{else if this.values.Default_Thumbnail_URL}}{{{this.values.Default_Thumbnail_URL}}}{{else}}/facebase-images/click-for-image.png{{/if}}){height=150}]({{{this.uri.detailed}}}){.pseudo-column-rowname-thumbnail-link} {{/each}}"
+                "markdown_pattern": "The original file contains the following sequence of images. Click an individual image for visualization.\n\n {{#each $self}} [:span: Image {{{this.values.Series}}} :{{{this.values.RID}}} :/span:{.pseudo-column-rowname-thumbnail-title}![]({{#if this.values.Thumbnail_URL}}{{{this.values.Thumbnail_URL}}}{{else}}/facebase-images/click-for-image.png{{/if}}){height=150}]({{{this.uri.detailed}}}){.pseudo-column-rowname-thumbnail-link} {{/each}}"
               },
               "array_options": {
                 "order": [
@@ -1565,11 +1565,6 @@ def create_image_table_if_not_exists(catalog, schema_name):
                 'Pixels_Per_Meter',
                 builtin_types.int4,
                 comment='Pixels per meter in image',
-                nullok=True
-                ),
-            Column.define(
-                'Default_Thumbnail_URL',
-                builtin_types.text,
                 nullok=True
                 ),
             Column.define(
