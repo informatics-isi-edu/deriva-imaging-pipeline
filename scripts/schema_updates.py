@@ -256,11 +256,6 @@ def create_processed_image_table_if_not_exists(catalog, schema_name):
                 nullok=True
                 ),
             Column.define(
-                'uri',
-                builtin_types.text,
-                nullok=True
-                ),
-            Column.define(
                 'Config',
                 builtin_types.jsonb,
                 nullok=True
