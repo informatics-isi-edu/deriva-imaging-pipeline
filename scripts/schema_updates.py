@@ -115,7 +115,6 @@ def restore(catalog):
     drop_table_if_exist(catalog, 'vocab', 'color')
     drop_table_if_exist(catalog, 'vocab', 'display_method')
     drop_table_if_exist(catalog, 'vocab', 'processing_status')
-    drop_table_if_exist(catalog, 'vocab', 'consortium')
     drop_schema_if_exist(catalog, 'Imaging')
 
 def create_vocabulary_table_if_not_exist(catalog, schema_name, table_name, comment):
@@ -152,16 +151,6 @@ def add_rows_to_vocab_display_method(catalog):
     pb = catalog.getPathBuilder()
     schema = pb.vocab
     display_method = schema.display_method
-    display_method.insert(rows, defaults=['ID', 'URI'])
-
-def add_rows_to_vocab_consortium(catalog):
-
-    rows =[
-        {'Name': 'FaceBase', 'Description': 'Comprehensive craniofacial data'},
-    ]
-    pb = catalog.getPathBuilder()
-    schema = pb.vocab
-    display_method = schema.consortium
     display_method.insert(rows, defaults=['ID', 'URI'])
 
 def add_rows_to_vocab_color(catalog):
@@ -609,17 +598,6 @@ def create_image_annotation_file_table_if_not_exists(catalog, schema_name):
                 },
                 "RID"
               ]
-            },
-            {
-              "source": [
-                {
-                  "outbound": [
-                    "Imaging",
-                    "Image_Annotation_File_Consortium_fkey"
-                  ]
-                },
-                "RID"
-              ]
             }
           ],
           "entry": [
@@ -668,17 +646,6 @@ def create_image_annotation_file_table_if_not_exists(catalog, schema_name):
                 },
                 "RID"
               ]
-            },
-            {
-              "source": [
-                {
-                  "outbound": [
-                    "Imaging",
-                    "Image_Annotation_File_Consortium_fkey"
-                  ]
-                },
-                "RID"
-              ]
             }
           ],
           "detailed": [
@@ -722,17 +689,6 @@ def create_image_annotation_file_table_if_not_exists(catalog, schema_name):
                   "outbound": [
                     "Imaging",
                     "Image_Annotation_File_Principal_Investigator_fkey"
-                  ]
-                },
-                "RID"
-              ]
-            },
-            {
-              "source": [
-                {
-                  "outbound": [
-                    "Imaging",
-                    "Image_Annotation_File_Consortium_fkey"
                   ]
                 },
                 "RID"
@@ -850,12 +806,6 @@ def create_image_annotation_file_table_if_not_exists(catalog, schema_name):
                 nullok=False
                 ),
             Column.define(
-                'Consortium',
-                builtin_types.text,
-                default='faceBase',
-                nullok=False
-                ),
-            Column.define(
                 'Release_Date',
                 builtin_types.timestamptz,
                 annotations={"tag:isrd.isi.edu,2016:generated": None},
@@ -898,11 +848,6 @@ def create_image_annotation_file_table_if_not_exists(catalog, schema_name):
             ),
             ForeignKey.define(['Principal_Investigator'], 'isa', 'person', ['name'],
                               constraint_names=[['Imaging', 'Image_Annotation_File_Principal_Investigator_fkey']],
-                              on_update='CASCADE',
-                              on_delete='SET NULL'   
-            ),
-            ForeignKey.define(['Consortium'], 'vocab', 'consortium', ['Name'],
-                              constraint_names=[['Imaging', 'Image_Annotation_File_Consortium_fkey']],
                               on_update='CASCADE',
                               on_delete='SET NULL'   
             )
@@ -979,17 +924,6 @@ def create_image_annotation_table_if_not_exists(catalog, schema_name):
                 },
                 "RID"
               ]
-            },
-            {
-              "source": [
-                {
-                  "outbound": [
-                    "Imaging",
-                    "Image_Annotation_Consortium_fkey"
-                  ]
-                },
-                "RID"
-              ]
             }
           ],
           "entry": [
@@ -1038,17 +972,6 @@ def create_image_annotation_table_if_not_exists(catalog, schema_name):
                   "outbound": [
                     "Imaging",
                     "Image_Annotation_Principal_Investigator_fkey"
-                  ]
-                },
-                "RID"
-              ]
-            },
-            {
-              "source": [
-                {
-                  "outbound": [
-                    "Imaging",
-                    "Image_Annotation_Consortium_fkey"
                   ]
                 },
                 "RID"
@@ -1104,17 +1027,6 @@ def create_image_annotation_table_if_not_exists(catalog, schema_name):
                   "outbound": [
                     "Imaging",
                     "Image_Annotation_Principal_Investigator_fkey"
-                  ]
-                },
-                "RID"
-              ]
-            },
-            {
-              "source": [
-                {
-                  "outbound": [
-                    "Imaging",
-                    "Image_Annotation_Consortium_fkey"
                   ]
                 },
                 "RID"
@@ -1207,18 +1119,13 @@ def create_image_annotation_table_if_not_exists(catalog, schema_name):
                 nullok=False
                 ),
             Column.define(
-                'Consortium',
-                builtin_types.text,
-                nullok=False
-                ),
-            Column.define(
                 'Release_Date',
                 builtin_types.timestamptz,
                 annotations={
                     "tag:isrd.isi.edu,2016:generated": None
                   },
                 nullok=True
-                ),
+                )
             ]
 
         key_defs = [
@@ -1257,12 +1164,7 @@ def create_image_annotation_table_if_not_exists(catalog, schema_name):
                               constraint_names=[['Imaging', 'Image_Annotation_Principal_Investigator_fkey']],
                               on_update='CASCADE',
                               on_delete='SET NULL'   
-            ),
-            ForeignKey.define(['Consortium'], 'vocab', 'consortium', ['Name'],
-                              constraint_names=[['Imaging', 'Image_Annotation_Consortium_fkey']],
-                              on_update='CASCADE',
-                              on_delete='SET NULL'   
-            ),
+            )
         ]
         table_def = Table.define(
             table_name,
@@ -1348,7 +1250,7 @@ def create_image_table_if_not_exists(catalog, schema_name):
         "tag:isrd.isi.edu,2016:column-display": {
           "*": {
             "template_engine": "handlebars",
-            "markdown_pattern": "{{#if (or uri Generated_Zs)}}::: iframe [](/chaise/viewer/#{{{$catalog.snapshot}}}/Imaging:Image/RID={{RID}}{{#if $fkeys.Imaging.Image_Consortium_fkey}}?waterMark={{#encode $fkeys.Imaging.Image_Consortium_fkey.values.URL}}{{/encode}}{{/if}}{{#if _Pixels_Per_Meter}}&meterScaleInPixels={{_Pixels_Per_Meter}}{{/if}}){style=\"min-width:1000px; min-height:700px; height:80vh;\" class=chaise-autofill  } \n :::{{else if Image_URL}} ![Image]({{Image_URL}}){{/if}}"
+            "markdown_pattern": "{{#if (or uri Generated_Zs)}}::: iframe [](/chaise/viewer/#{{{$catalog.snapshot}}}/Imaging:Image/RID={{RID}}?waterMark=FaceBase{{#if _Pixels_Per_Meter}}&meterScaleInPixels={{_Pixels_Per_Meter}}{{/if}}){style=\"min-width:1000px; min-height:700px; height:80vh;\" class=chaise-autofill  } \n :::{{else if Image_URL}} ![Image]({{Image_URL}}){{/if}}"
           }
         }
       }
@@ -1411,17 +1313,6 @@ def create_image_table_if_not_exists(catalog, schema_name):
                 "source": "Original_File_Name",
                 "ux_mode": "choices",
                 "markdown_name": "File Name"
-              },
-              {
-                "source": [
-                  {
-                    "outbound": [
-                      "Imaging",
-                      "Image_Consortium_fkey"
-                    ]
-                  },
-                  "RID"
-                ]
               }
             ]
           },
@@ -1453,10 +1344,6 @@ def create_image_table_if_not_exists(catalog, schema_name):
             {
               "source": "Notes"
             },
-            [
-              "Imaging",
-              "Image_Consortium_fkey"
-            ],
             {
               "source": "Thumbnail_URL"
             },
@@ -1665,11 +1552,6 @@ def create_image_table_if_not_exists(catalog, schema_name):
                 nullok=True
                 ),
             Column.define(
-                'Consortium',
-                builtin_types.text,
-                nullok=False
-                ),
-            Column.define(
                 'Notes',
                 builtin_types.markdown,
                 nullok=True
@@ -1847,11 +1729,6 @@ def create_image_table_if_not_exists(catalog, schema_name):
                               constraint_names=[['Imaging', 'Image_Stage_fkey']],
                               on_update='NO ACTION',
                               on_delete='NO ACTION'   
-            ),
-            ForeignKey.define(['Consortium'], 'vocab', 'consortium', ['Name'],
-                              constraint_names=[['Imaging', 'Image_Consortium_fkey']],
-                              on_update='CASCADE',
-                              on_delete='NO ACTION'   
             )
         ]
         table_def = Table.define(
@@ -1933,7 +1810,6 @@ print('Creating vocabulary tables ...')
 create_vocabulary_table_if_not_exist(catalog_ermrest, 'vocab', 'processing_status', 'A set of status for processing an image.')
 create_vocabulary_table_if_not_exist(catalog_ermrest, 'vocab', 'display_method', 'Table containing controlled names for image display methods.')
 create_vocabulary_table_if_not_exist(catalog_ermrest, 'vocab', 'color', 'Colors and other terms used to describe slide channel appearance.')
-create_vocabulary_table_if_not_exist(catalog_ermrest, 'vocab', 'consortium', 'Consortium.')
 
 """
 Load data into the new vocabulary tables.
@@ -1942,7 +1818,6 @@ print('Loading the vocabulary tables ...')
 add_rows_to_vocab_processing_status(catalog_ermrest)
 add_rows_to_vocab_display_method(catalog_ermrest)
 add_rows_to_vocab_color(catalog_ermrest)
-add_rows_to_vocab_consortium(catalog_ermrest)
 
 """
 Create the Imaging schema.

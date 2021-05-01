@@ -77,7 +77,6 @@ class DerivaImagingWorker (object):
         self.scheme = o[0]
         host_port = o[1].split(':')
         self.host = host_port[0]
-        self.consortium_host = None
         self.path = o.path
         self.port = None
         if len(host_port) > 1:
@@ -281,7 +280,6 @@ class DerivaImagingWorker (object):
         row['Image_Order'] = image_order + scene + 1
         row['Default_Z'] = z_index
         row['Series'] = scene
-        row['Consortium'] = 'FaceBase'
         row['Original_File_Name'] = '{} (image {})'.format(parent_original_file_name, scene)
         row['Generated_Zs'] = 1 if z_index_no <= self.z_threshold else z_index_no
         row['Properties'] = self.tiff_files[scene]['series_properties']
@@ -297,7 +295,6 @@ class DerivaImagingWorker (object):
         row['Original_File_Bytes'] = primary_row[self.model['primary_file_bytes']]
         row['Original_File_MD5'] = primary_row[self.model['primary_file_md5']]
         row['Primary_Table'] = rid
-        row['Consortium'] = 'FaceBase'
         return row
     
     """
