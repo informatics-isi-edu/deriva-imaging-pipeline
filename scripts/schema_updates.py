@@ -1241,15 +1241,6 @@ def create_image_table_if_not_exists(catalog, schema_name):
         }
       }
 
-    uri_annotations = {
-        "tag:isrd.isi.edu,2016:column-display": {
-          "*": {
-            "template_engine": "handlebars",
-            "markdown_pattern": "{{#if (or uri Generated_Zs)}}::: iframe [](/chaise/viewer/#{{{$catalog.snapshot}}}/Imaging:Image/RID={{RID}}?waterMark=FaceBase{{#if _Pixels_Per_Meter}}&meterScaleInPixels={{_Pixels_Per_Meter}}{{/if}}){style=\"min-width:1000px; min-height:700px; height:80vh;\" class=chaise-autofill  } \n :::{{else if Image_URL}} ![Image]({{Image_URL}}){{/if}}"
-          }
-        }
-      }
-
     table_annotations = {
         "tag:isrd.isi.edu,2016:table-display": {
           "row_name": {
@@ -1368,8 +1359,12 @@ def create_image_table_if_not_exists(catalog, schema_name):
               "markdown_name": "Image Annotators"
             },
             {
-              "source": "uri",
-              "hide_column_header": True
+              "markdown_name": "uri",
+              "hide_column_header": True,
+              "display": {
+                    "template_engine": "handlebars",
+                    "markdown_pattern": "{{#if Generated_Zs}}::: iframe [](/chaise/viewer/#{{{$catalog.snapshot}}}/Imaging:Image/RID={{RID}}?waterMark=FaceBase{{#if _Pixels_Per_Meter}}&meterScaleInPixels={{_Pixels_Per_Meter}}{{/if}}){style=\"min-width:1000px; min-height:700px; height:80vh;\" class=chaise-autofill  } \n :::{{else if Image_URL}} ![Image]({{Image_URL}}){{/if}}"
+              }
             }
           ]
         },
@@ -1532,12 +1527,6 @@ def create_image_table_if_not_exists(catalog, schema_name):
             Column.define(
                 'Notes',
                 builtin_types.markdown,
-                nullok=True
-                ),
-            Column.define(
-                'uri',
-                builtin_types.text,
-                annotations=uri_annotations,
                 nullok=True
                 ),
             Column.define(
