@@ -1258,30 +1258,13 @@ def create_image_table_if_not_exists(catalog, schema_name):
           },
           "row_name/compact": {
             "template_engine": "handlebars",
-            "row_markdown_pattern": "[:span:{{{Stage}}} :/span:{.pseudo-column-rowname-thumbnail-title}![]({{#if Thumbnail_URL}}{{{Thumbnail_URL}}}{{else if Default_Thumbnail_URL}}{{{Default_Thumbnail_URL}}}{{else}}/facebase-images/click-for-image.png{{/if}}){height=75}](/chaise/record/#{{{$catalog.snapshot}}}/Imaging:Image/RID={{{RID}}}){.pseudo-column-rowname-thumbnail-link}"
+            "row_markdown_pattern": "[:span: :/span:{.pseudo-column-rowname-thumbnail-title}![]({{#if Thumbnail_URL}}{{{Thumbnail_URL}}}{{else if Default_Thumbnail_URL}}{{{Default_Thumbnail_URL}}}{{else}}/facebase-images/click-for-image.png{{/if}}){height=75}](/chaise/record/#{{{$catalog.snapshot}}}/Imaging:Image/RID={{{RID}}}){.pseudo-column-rowname-thumbnail-link}"
           }
         },
         "tag:isrd.isi.edu,2016:visible-columns": {
           "entry": [
             "RID",
-            [
-              "Gene_Expression",
-              "Image_Specimen_denormalize_fkey"
-            ],
-            {
-              "comment": "Type of original uploaded file",
-              "sourcekey": "Media_Types",
-              "markdown_name": "Media Type"
-            },
-            "Original_File_URL",
-            {
-              "source": "Pixels_Per_Meter",
-              "comment": "Number of pixels per meter associated with the image. This data represents pixel to physical scaling information."
-            },
-            "Thumbnail_URL",
-            "Notes",
-            "Release_Date",
-            "Default_Z"
+            "Notes"
           ],
           "filter": {
             "and": [
@@ -1579,12 +1562,6 @@ def create_image_table_if_not_exists(catalog, schema_name):
                 nullok=True
                 ),
             Column.define(
-                'Stage',
-                builtin_types.text,
-                comment='Specimen stage',
-                nullok=True
-                ),
-            Column.define(
                 'Pixels_Per_Meter',
                 builtin_types.int4,
                 comment='Pixels per meter in image',
@@ -1719,11 +1696,6 @@ def create_image_table_if_not_exists(catalog, schema_name):
                               constraint_names=[['Imaging', 'Image_Primary_Table_imaging_data_RID_fkey']],
                               on_update='CASCADE',
                               on_delete='CASCADE'   
-            ),
-            ForeignKey.define(['Stage'], 'vocab', 'stage', ['id'],
-                              constraint_names=[['Imaging', 'Image_Stage_fkey']],
-                              on_update='NO ACTION',
-                              on_delete='NO ACTION'   
             )
         ]
         table_def = Table.define(
