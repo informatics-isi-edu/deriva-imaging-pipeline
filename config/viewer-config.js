@@ -13,36 +13,11 @@ var viewerConfigs = {
              */
             "pixel_per_meter_column_name": "Pixels_Per_Meter",
 
-            /**
-             * The following watermark attributes are used for the watermark
-             * displayed in the screenshot feature.
-             */
-
-            // if the watermark is defined in the same table, use this attribute
-            // if empty, we will not use it
-            "watermark_column_name": "Consortium",
-
-            // if the watermakr is defined in another table that has fk to image,
-            // use the following attribute
-            // TODO: need a better way to specify better foreignkey path
-            "watermark_foreign_key_visible_column_name": "Pq797msQqRnD3Je3Jp01HQ",
-            "watermark_foreign_key_data_column_name": "URL",
-
             // what should be displayed in the head title (the browser tab)
             "head_title_markdown_pattern": "",
 
             // what should be displayed in the page title in full screen mode (non-iframe)
             "page_title_markdown_pattern": "",
-
-            /**
-             * @DEPRECATED This is here for just backward compatibilty and should not be used.
-             * if defined and value is none-empty, we will not send any extra request for image channel info
-             * and use the value stored in this column.
-             *
-             * As a hack, if the stored value has query parameters, we will only
-             * use the query parameters. Otherwise it will use the stored value as is.
-             */
-            "legacy_osd_url_column_name": "uri",
         },
         /**
          * the table that stores each individual image for each channel in each z-plane
