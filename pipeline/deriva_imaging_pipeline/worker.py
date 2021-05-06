@@ -274,10 +274,6 @@ class DerivaImagingWorker (object):
                 file_name = parent_original_file_name[0:index]
             except:
                 file_name = parent_original_file_name
-        image_order = parent_row['Image_Order']
-        if image_order == None:
-            image_order = 0
-        row['Image_Order'] = image_order + scene + 1
         row['Default_Z'] = z_index
         row['Series'] = scene
         row['Original_File_Name'] = '{} (image {})'.format(parent_original_file_name, scene)
@@ -864,9 +860,6 @@ class DerivaImagingWorker (object):
                 'Series': None,
                 'Default_Z': middle_z_index
             }
-            if parent_row['Image_Order'] == None:
-                cols.append('Image_Order')
-                obj['Image_Order'] = 1
             if parent_row['Original_File_Name'] == None:
                 cols.append('Original_File_Name')
                 obj['Original_File_Name'] = '{} (image 0)'.format(parent_row['RID'])

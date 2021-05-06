@@ -1427,7 +1427,7 @@ def create_image_table_if_not_exists(catalog, schema_name):
               "array_options": {
                 "order": [
                   {
-                    "column": "Image_Order",
+                    "column": "Series",
                     "descending": False
                   }
                 ]
@@ -1517,11 +1517,6 @@ def create_image_table_if_not_exists(catalog, schema_name):
                 'Image_URL',
                 builtin_types.text,
                 annotations=image_url_annotations,
-                nullok=True
-                ),
-            Column.define(
-                'Image_Order',
-                builtin_types.int4,
                 nullok=True
                 ),
             Column.define(
