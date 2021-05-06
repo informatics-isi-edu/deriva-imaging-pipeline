@@ -1212,18 +1212,6 @@ def add_column_if_not_exist(catalog, schema_name, table_name, column_name, colum
         table.create_column(Column.define(column_name, builtin_types[column_type], default=default_value, nullok=nullok))
 
 def create_image_table_if_not_exists(catalog, schema_name):
-    image_url_annotations = {
-        "tag:misd.isi.edu,2015:display": {
-          "name": "Image"
-        },
-        "tag:isrd.isi.edu,2016:column-display": {
-          "*": {
-            "template_engine": "handlebars",
-            "markdown_pattern": "![Image]({{Image_URL}})"
-          }
-        }
-      }
-
     thumbnail_annotations = {
         "tag:misd.isi.edu,2015:display": {
           "name": "Thumbnail"
@@ -1363,7 +1351,7 @@ def create_image_table_if_not_exists(catalog, schema_name):
               "hide_column_header": True,
               "display": {
                     "template_engine": "handlebars",
-                    "markdown_pattern": "{{#if Generated_Zs}}::: iframe [](/chaise/viewer/#{{{$catalog.snapshot}}}/Imaging:Image/RID={{RID}}?waterMark=FaceBase{{#if _Pixels_Per_Meter}}&meterScaleInPixels={{_Pixels_Per_Meter}}{{/if}}){style=\"min-width:1000px; min-height:700px; height:80vh;\" class=chaise-autofill  } \n :::{{else if Image_URL}} ![Image]({{Image_URL}}){{/if}}"
+                    "markdown_pattern": "{{#if Generated_Zs}}::: iframe [](/chaise/viewer/#{{{$catalog.snapshot}}}/Imaging:Image/RID={{RID}}?waterMark=FaceBase{{#if _Pixels_Per_Meter}}&meterScaleInPixels={{_Pixels_Per_Meter}}{{/if}}){style=\"min-width:1000px; min-height:700px; height:80vh;\" class=chaise-autofill  } \n {{/if}}"
               }
             }
           ]
@@ -1511,12 +1499,6 @@ def create_image_table_if_not_exists(catalog, schema_name):
                 builtin_types.text,
                 comment=None, 
                 annotations=thumbnail_annotations,                       
-                nullok=True
-                ),
-            Column.define(
-                'Image_URL',
-                builtin_types.text,
-                annotations=image_url_annotations,
                 nullok=True
                 ),
             Column.define(
