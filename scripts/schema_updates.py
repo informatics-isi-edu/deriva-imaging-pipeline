@@ -1292,10 +1292,6 @@ def create_image_table_if_not_exists(catalog, schema_name):
               "sourcekey": "Original_File"
             },
             {
-              "source": "Original_File_Bytes",
-              "markdown_name": "File Size (Bytes)"
-            },
-            {
               "source": "Pixels_Per_Meter"
             },
             {
@@ -1379,13 +1375,13 @@ def create_image_table_if_not_exists(catalog, schema_name):
               "markdown_name": "Annotated"
             },
             "Original_File": {
-              "source": "Original_File_URL",
+              "source": "Original_File_Name",
               "display": {
                 "wait_for": [
                   "Num_Derived_Images"
                 ],
                 "template_engine": "handlebars",
-                "markdown_pattern": "{{#if Parent_Image}}[{{{Parent_Image_Row.values.Original_File_Name}}} (extracted image {{{Series}}})]({{{Parent_Image_Row.values.Original_File_URL}}}){.download-alt}{{else if (gt Num_Derived_Images 0)}}[{{{Original_File_Name}}} (image set of {{{Num_Derived_Images}}})]({{{Original_File_URL}}}){.download-alt}{{else}}[{{{Original_File_Name}}}]({{{Original_File_URL}}}){.download-alt}{{/if}}"
+                "markdown_pattern": "{{#if Parent_Image}}{{{Parent_Image_Row.values.Original_File_Name}}} (extracted image {{{Series}}}){{else if (gt Num_Derived_Images 0)}}{{{Original_File_Name}}} (image set of {{{Num_Derived_Images}}}){{else}}{{{Original_File_Name}}}{{/if}}"
               }
             },
             "Updated_Notes": {
@@ -1478,16 +1474,6 @@ def create_image_table_if_not_exists(catalog, schema_name):
         }
       }
  
-    original_file_url_annotations =  {
-        "tag:isrd.isi.edu,2017:asset": {
-          "browser_upload": False
-        },
-        "tag:misd.isi.edu,2015:display": {
-          "name": "Original File"
-        },
-        "tag:isrd.isi.edu,2018:required": {}
-      }
-
     table_name = 'Image'
     comment = None
     model = catalog.getCatalogModel()
@@ -1508,22 +1494,6 @@ def create_image_table_if_not_exists(catalog, schema_name):
                 ),
             Column.define(
                 'Original_File_Name',
-                builtin_types.text,
-                nullok=True
-                ),
-            Column.define(
-                'Original_File_URL',
-                builtin_types.text,
-                annotations=original_file_url_annotations,
-                nullok=True
-                ),
-            Column.define(
-                'Original_File_Bytes',
-                builtin_types.int8,
-                nullok=True
-                ),
-            Column.define(
-                'Original_File_MD5',
                 builtin_types.text,
                 nullok=True
                 ),

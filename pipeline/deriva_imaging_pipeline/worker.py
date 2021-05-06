@@ -287,9 +287,6 @@ class DerivaImagingWorker (object):
     def getImageRow(self, primary_row, rid):
         row = {}
         row['Original_File_Name'] = primary_row[self.model['primary_file_name']]
-        row['Original_File_URL'] = primary_row[self.model['primary_file_url']]
-        row['Original_File_Bytes'] = primary_row[self.model['primary_file_bytes']]
-        row['Original_File_MD5'] = primary_row[self.model['primary_file_md5']]
         row['Primary_Table'] = rid
         return row
     
