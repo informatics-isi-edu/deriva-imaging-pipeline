@@ -6,7 +6,6 @@
     "primary_file_bytes": "byte_count",
     "primary_file_md5": "md5",
     "processing_status": "processing_status",
-    "primary_table_image_column": "image",
     "image_schema": "Imaging",
     "image_table": "Image",
     "processed_image": "Processed_Image",
