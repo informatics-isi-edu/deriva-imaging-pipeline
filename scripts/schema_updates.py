@@ -181,7 +181,7 @@ def create_processed_image_table_if_not_exists(catalog, schema_name):
           "compact": [
             "RID",
             [
-              "Gene_Expression",
+              "Imaging",
               "Processed_Image_Reference_Image_fkey"
             ],
             "File_URL",
@@ -192,7 +192,7 @@ def create_processed_image_table_if_not_exists(catalog, schema_name):
           "detailed": [
             "RID",
             [
-              "Gene_Expression",
+              "Imaging",
               "Processed_Image_Reference_Image_fkey"
             ],
             "File_URL",
@@ -444,7 +444,7 @@ def create_image_z_table_if_not_exists(catalog, schema_name):
           "*": [
             "RID",
             [
-              "Gene_Expression",
+              "Imaging",
               "Image_Z_Image_fkey"
             ],
             "OME_Companion_URL",
@@ -733,7 +733,7 @@ def create_image_annotation_file_table_if_not_exists(catalog, schema_name):
                 comment='SVG overlay file',
                 annotations={"tag:isrd.isi.edu,2017:asset": {
                       "md5": "SVG_File_MD5",
-                      "url_pattern": "/hatrac/facebase/data/fb3/{dataset}/{replicate}/svg",
+                      "url_pattern": "/hatrac/facebase/data/fb3/svg",
                       "filename_column": "SVG_File_Name",
                       "byte_count_column": "SVG_File_Bytes"
                     }
@@ -762,7 +762,7 @@ def create_image_annotation_file_table_if_not_exists(catalog, schema_name):
                 annotations={
                     "tag:isrd.isi.edu,2017:asset": {
                       "md5": "QuPath_Class_File_MD5",
-                      "url_pattern": "/hatrac/facebase/data/fb3/{dataset}/{replicate}/qupath/{{{QuPath_Class_File_MD5}}}",
+                      "url_pattern": "/hatrac/facebase/data/fb3/qupath/{{{QuPath_Class_File_MD5}}}",
                       "filename_column": "QuPath_Class_File_Name",
                       "byte_count_column": "QuPath_Class_File_Bytes"
                     }
@@ -1061,7 +1061,7 @@ def create_image_annotation_table_if_not_exists(catalog, schema_name):
                 annotations={
                     "tag:isrd.isi.edu,2017:asset": {
                       "md5": "File_MD5",
-                      "url_pattern": "/hatrac/facebase/data/fb3/{dataset}/{replicate}/annotations",
+                      "url_pattern": "/hatrac/facebase/data/fb3/annotations/{{$moment.year}}/{{{File_MD5}}}",
                       "filename_column": "File_Name",
                       "byte_count_column": "File_Bytes"
                     }
@@ -1219,7 +1219,7 @@ def create_image_table_if_not_exists(catalog, schema_name):
         "tag:isrd.isi.edu,2016:column-display": {
           "*": {
             "template_engine": "handlebars",
-            "markdown_pattern": "[![Image]({{#if Thumbnail_URL}}{{Thumbnail_URL}}{{else}}/facebase-images/click-for-image.png{{/if}}){height=75}](/chaise/record/#{{{$catalog.snapshot}}}/Imaging:Image/RID={{RID}})"
+            "markdown_pattern": "{{#if Thumbnail_URL}}[![Thumbnail]({{{Thumbnail_URL}}}){height=75}]({{{Thumbnail_URL}}}){{/if}}"
           },
           "name": "Thumbnail (click to view)",
           "detailed": {
@@ -1230,6 +1230,61 @@ def create_image_table_if_not_exists(catalog, schema_name):
       }
 
     table_annotations = {
+          "tag:isrd.isi.edu,2019:export": {
+            "detailed": {
+              "templates": [
+                {
+                  "type": "BAG",
+                  "outputs": [
+                    {
+                      "source": {
+                        "api": "attribute",
+                        "path": "(RID)=(Imaging:Processed_Image:Reference_Image)/url:=File_URL,length:=File_Bytes,filename:=File_Name,md5:=File_MD5,Reference_Image"
+                      },
+                      "destination": {
+                        "name": "Files/QuPath/{Reference_Image}",
+                        "type": "fetch"
+                      }
+                    },
+                    {
+                      "source": {
+                        "api": "attribute",
+                        "path": "(RID)=(Imaging:Image_Z:Image)/url:=OME_Companion_URL,length:=OME_Companion_Bytes,filename:=OME_Companion_Name,md5:=OME_Companion_MD5,Image"
+                      },
+                      "destination": {
+                        "name": "Files/QuPath/{Image}",
+                        "type": "fetch"
+                      }
+                    },
+                    {
+                      "source": {
+                        "api": "attribute",
+                        "path": "(RID)=(Imaging:Image:Parent_Image)/(RID)=(Imaging:Processed_Image:Reference_Image)/url:=File_URL,length:=File_Bytes,filename:=File_Name,md5:=File_MD5,Reference_Image"
+                      },
+                      "destination": {
+                        "name": "Files/QuPath/{Reference_Image}",
+                        "type": "fetch"
+                      }
+                    },
+                    {
+                      "source": {
+                        "api": "attribute",
+                        "path": "(RID)=(Imaging:Image:Parent_Image)/(RID)=(Imaging:Image_Z:Image)/url:=OME_Companion_URL,length:=OME_Companion_Bytes,filename:=OME_Companion_Name,md5:=OME_Companion_MD5,Image"
+                      },
+                      "destination": {
+                        "name": "Files/QuPath/{Image}",
+                        "type": "fetch"
+                      }
+                    }
+                  ],
+                  "displayname": "BDBAG (all files)"
+                }
+              ]
+            }
+          },
+        "tag:misd.isi.edu,2015:display": {
+          "name": "Visualization Image"
+        },
         "tag:isrd.isi.edu,2016:table-display": {
           "row_name": {
             "template_engine": "handlebars",
@@ -1237,7 +1292,7 @@ def create_image_table_if_not_exists(catalog, schema_name):
           },
           "row_name/compact": {
             "template_engine": "handlebars",
-            "row_markdown_pattern": "[:span: :/span:{.pseudo-column-rowname-thumbnail-title}![]({{#if Thumbnail_URL}}{{{Thumbnail_URL}}}{{else}}/facebase-images/click-for-image.png{{/if}}){height=75}](/chaise/record/#{{{$catalog.snapshot}}}/Imaging:Image/RID={{{RID}}}){.pseudo-column-rowname-thumbnail-link}"
+            "row_markdown_pattern": "[:span: :/span:{.pseudo-column-rowname-thumbnail-title}![]({{#if Thumbnail_URL}}{{{Thumbnail_URL}}}{{/if}}){height=75}](/chaise/record/#{{{$catalog.snapshot}}}/Imaging:Image/RID={{{RID}}}){.pseudo-column-rowname-thumbnail-link}"
           }
         },
         "tag:isrd.isi.edu,2016:visible-columns": {
@@ -1265,19 +1320,13 @@ def create_image_table_if_not_exists(catalog, schema_name):
                   "RID"
                 ],
                 "markdown_name": "Annotated Anatomy"
-              },
-              {
-                "source": "Original_File_Name",
-                "ux_mode": "choices",
-                "markdown_name": "File Name"
               }
             ]
           },
           "compact": [
             "RID",
-            "Thumbnail_URL",
             {
-              "sourcekey": "Original_File"
+              "source": "Pixels_Per_Meter"
             },
             {
               "sourcekey": "Annotated"
@@ -1289,7 +1338,17 @@ def create_image_table_if_not_exists(catalog, schema_name):
           "detailed": [
             "RID",
             {
-              "sourcekey": "Original_File"
+              "source": [
+                {
+                  "outbound": [
+                    "Imaging",
+                    "Image_Primary_Table_imaging_data_RID_fkey"
+                  ]
+                },
+                "RID"
+              ],
+              "comment": "A reference to the primary image.",
+              "markdown_name": "Primary Image"
             },
             {
               "source": "Pixels_Per_Meter"
@@ -1313,10 +1372,6 @@ def create_image_table_if_not_exists(catalog, schema_name):
             },
             {
               "sourcekey": "Derived_Images"
-            },
-            {
-              "source": "Download_Tiff_URL",
-              "markdown_name": "Download Tiff"
             },
             {
               "source": [

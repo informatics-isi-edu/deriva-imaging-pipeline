@@ -340,6 +340,27 @@ class DerivaImagingWorker (object):
         primary_row = row
         
         """
+        Check if the primary image has a thumbnail uploaded by the user:
+        
+        """
+        self.primary_thumbnail = self.model.get('primary_file_thumbnail')
+        if self.primary_thumbnail != None:
+            """
+            Query for detecting if the primary image has a thumbnail uploaded by the user:
+            
+            /entity/{primary_schema}:{primary_table}/RID={rid}/self.primary_thumbnail
+            
+            """
+            url = '/attribute/{}:{}/RID={}/{}'.format(urlquote(self.model['primary_schema']), urlquote(self.model['primary_table']), urlquote(rid), self.primary_thumbnail)
+            self.logger.debug('Primary thumbnail query URL: "{}"'.format(url)) 
+            resp = self.catalog.get(url)
+            resp.raise_for_status()
+            if len(resp.json()) > 0:
+                primary_thumbnail_column = self.primary_thumbnail.split('/')[-1]
+                self.primary_thumbnail = resp.json()[0][primary_thumbnail_column]
+        self.logger.debug('Primary thumbnail value: "{}"'.format(self.primary_thumbnail)) 
+
+        """
         Query for getting the Image record:
         
         /entity/{image_schema}:{image_table}/Primary_Table=rid
@@ -1062,7 +1083,7 @@ class DerivaImagingWorker (object):
                                              'Pixels_Per_Meter', 
                                              'OME_XML_URL', 'OME_XML_Name', 'OME_XML_Bytes', 'OME_XML_MD5'],
                                             {'RID': scenes[str(serie)],
-                                            'Thumbnail_URL': thumbnail_url,
+                                            'Thumbnail_URL': thumbnail_url if self.primary_thumbnail == None else None,
                                             'Default_Z': middle_z_index,
                                             'Download_Tiff_URL': download_tiff_url,
                                             'Download_Tiff_Name': download_tiff_file_name,

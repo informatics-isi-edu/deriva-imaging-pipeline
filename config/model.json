@@ -5,6 +5,7 @@
     "primary_file_url": "url",
     "primary_file_bytes": "byte_count",
     "primary_file_md5": "md5",
+    "primary_file_thumbnail": "isa:thumbnail/url",
     "processing_status": "processing_status",
     "image_schema": "Imaging",
     "image_table": "Image",
