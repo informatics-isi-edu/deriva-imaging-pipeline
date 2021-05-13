@@ -99,12 +99,11 @@ var viewerConfigs = {
             "table_name": "Image_Annotation",
 
             // fk to image table in annotation table
-            "reference_image_visible_column_name": "yPvKjgRdJu0XC6WD-2D6XQ",
+            "reference_image_visible_column_name": "hlfOY0hhIprg_cr6yKd1Tg",
             "reference_image_column_name": "Image",
 
             // the asset column that has the annotation
             "overlay_column_name": "File_URL",
-            "overlay_hatrac_path": "resources/gene_expression/annotations",
 
             // the columns that are used internally and should be removed from the entry form
             // TODO should be improved
@@ -117,7 +116,7 @@ var viewerConfigs = {
              */
             "annotated_term_displayname": "Anatomy",
             "annotated_term_column_name": "Anatomy",
-            "annotated_term_visible_column_name": "3HIyfQyg2efVSZ9KzxjQzQ",
+            "annotated_term_visible_column_name": "SyZB2C2sWgwedJI5WWFOYQ",
             "annotated_term_foreign_key_constraint": ["Imaging", "Image_Annotation_Anatomy_fkey"],
 
             /**
