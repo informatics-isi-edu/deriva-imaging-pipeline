@@ -839,17 +839,6 @@ def create_image_annotation_table_if_not_exists(catalog, schema_name):
             },
             {
               "source": "Comments"
-            },
-            {
-              "source": [
-                {
-                  "outbound": [
-                    "Imaging",
-                    "Image_Annotation_Curation_Status_fkey"
-                  ]
-                },
-                "RID"
-              ]
             }
           ],
           "entry": [
