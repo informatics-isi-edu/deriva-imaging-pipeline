@@ -571,28 +571,6 @@ def create_image_annotation_file_table_if_not_exists(catalog, schema_name):
             },
             {
               "source": "Processing_Detail"
-            },
-            {
-              "source": [
-                {
-                  "outbound": [
-                    "Imaging",
-                    "Image_Annotation_File_Curation_Status_fkey"
-                  ]
-                },
-                "RID"
-              ]
-            },
-            {
-              "source": [
-                {
-                  "outbound": [
-                    "Imaging",
-                    "Image_Annotation_File_Principal_Investigator_fkey"
-                  ]
-                },
-                "RID"
-              ]
             }
           ],
           "entry": [
@@ -619,28 +597,6 @@ def create_image_annotation_file_table_if_not_exists(catalog, schema_name):
             },
             {
               "source": "Notes"
-            },
-            {
-              "source": [
-                {
-                  "outbound": [
-                    "Imaging",
-                    "Image_Annotation_File_Curation_Status_fkey"
-                  ]
-                },
-                "RID"
-              ]
-            },
-            {
-              "source": [
-                {
-                  "outbound": [
-                    "Imaging",
-                    "Image_Annotation_File_Principal_Investigator_fkey"
-                  ]
-                },
-                "RID"
-              ]
             }
           ],
           "detailed": [
@@ -672,22 +628,8 @@ def create_image_annotation_file_table_if_not_exists(catalog, schema_name):
               "source": "Notes"
             },
             {
-              "source": "Curation_Status"
-            },
-            {
               "source": "Processing_Status",
               "display": "{{{Processing_Status}}}{{#if Processing_Detail}}{{{Processing_Detail}}}{{/if}}"
-            },
-            {
-              "source": [
-                {
-                  "outbound": [
-                    "Imaging",
-                    "Image_Annotation_File_Principal_Investigator_fkey"
-                  ]
-                },
-                "RID"
-              ]
             },
             {
               "source": "Release_Date"
@@ -793,12 +735,12 @@ def create_image_annotation_file_table_if_not_exists(catalog, schema_name):
                 'Curation_Status',
                 builtin_types.text,
                 default='In Preparation',
-                nullok=False
+                nullok=True
                 ),
             Column.define(
                 'Principal_Investigator',
                 builtin_types.text,
-                nullok=False
+                nullok=True
                 ),
             Column.define(
                 'Release_Date',
@@ -908,17 +850,6 @@ def create_image_annotation_table_if_not_exists(catalog, schema_name):
                 },
                 "RID"
               ]
-            },
-            {
-              "source": [
-                {
-                  "outbound": [
-                    "Imaging",
-                    "Image_Annotation_Principal_Investigator_fkey"
-                  ]
-                },
-                "RID"
-              ]
             }
           ],
           "entry": [
@@ -949,28 +880,6 @@ def create_image_annotation_table_if_not_exists(catalog, schema_name):
             },
             {
               "source": "Comments"
-            },
-            {
-              "source": [
-                {
-                  "outbound": [
-                    "Imaging",
-                    "Image_Annotation_Curation_Status_fkey"
-                  ]
-                },
-                "RID"
-              ]
-            },
-            {
-              "source": [
-                {
-                  "outbound": [
-                    "Imaging",
-                    "Image_Annotation_Principal_Investigator_fkey"
-                  ]
-                },
-                "RID"
-              ]
             }
           ],
           "detailed": [
@@ -1004,28 +913,6 @@ def create_image_annotation_table_if_not_exists(catalog, schema_name):
             },
             {
               "source": "Z_Index"
-            },
-            {
-              "source": [
-                {
-                  "outbound": [
-                    "Imaging",
-                    "Image_Annotation_Curation_Status_fkey"
-                  ]
-                },
-                "RID"
-              ]
-            },
-            {
-              "source": [
-                {
-                  "outbound": [
-                    "Imaging",
-                    "Image_Annotation_Principal_Investigator_fkey"
-                  ]
-                },
-                "RID"
-              ]
             },
             {
               "display": {
@@ -1106,12 +993,12 @@ def create_image_annotation_table_if_not_exists(catalog, schema_name):
             Column.define(
                 'Curation_Status',
                 builtin_types.text,
-                nullok=False
+                nullok=True
                 ),
             Column.define(
                 'Principal_Investigator',
                 builtin_types.text,
-                nullok=False
+                nullok=True
                 ),
             Column.define(
                 'Release_Date',
