@@ -15,8 +15,185 @@ import sys
 from deriva.core import ErmrestCatalog, get_credential
 from deriva.core.ermrest_model import builtin_types, Table, Schema, Key, ForeignKey, Column
 from deriva.core.ermrest_model import tag as chaise_tags
+from ast import literal_eval
 
-def add_annotation(catalog, schema_name, table_name, value):
+facebase_users = ["https://auth.globus.org/143f5bdc-c127-11e4-ab32-22000a1dd033"]
+facebase_admins = ["https://auth.globus.org/3dafcdea-fbfa-11e4-86df-22000aa51e6e","https://dev.facebase.org/webauthn_robot/fb_cron","https://staging.facebase.org/webauthn_robot/fb_cron","https://www.facebase.org/webauthn_robot/fb_cron"]
+facebase_curators = ["https://auth.globus.org/8438a12e-6589-11e7-9091-22000b500e8d","https://dev.facebase.org/webauthn_robot/fb_cron","https://staging.facebase.org/webauthn_robot/fb_cron","https://www.facebase.org/webauthn_robot/fb_cron"]
+facebase_writers = ["https://auth.globus.org/01c7bf28-2622-11e7-9ad7-22000b74c0b7"]
+facebase_dar_users = ["https://auth.globus.org/c0a2bf2d-9179-11ea-82db-0a875b138121"]
+
+admins = facebase_admins
+curators = facebase_curators
+writers = facebase_writers
+writers_and_curators = curators + writers
+users = facebase_users + writers_and_curators
+dar_users = facebase_dar_users + facebase_curators
+
+isa_curation_policy = {"insert": writers_and_curators, "update": curators, "delete": curators}
+schema_acls = isa_curation_policy
+
+restricted_visibility_policy = {"select": curators}
+table_acls = restricted_visibility_policy
+
+dataset_suppl_released_guard = """
+{
+    "types": [
+      "select"
+    ],
+    "projection": [
+        %INCLUDE%
+        {
+          "outbound": [
+            "Imaging",
+            "Image_Primary_Table_imaging_data_RID_fkey"
+          ]
+        },
+        {
+          "outbound": [
+            "isa",
+            "imaging_data_dataset_fkey"
+          ]
+        },
+        {
+          "filter": "released",
+          "operator": "=",
+          "operand": True
+        },
+        "RID"
+    ],
+    "projection_type": "nonnull"
+}
+"""
+
+dataset_suppl_edit_guard = """
+{
+    "types": [
+      "select",
+      "update",
+      "delete"
+    ],
+    "scope_acl": writers,
+    "projection": [
+        %INCLUDE%
+        {
+          "outbound": [
+            "Imaging",
+            "Image_Primary_Table_imaging_data_RID_fkey"
+          ]
+        },
+        {
+          "outbound": [
+            "isa",
+            "imaging_data_dataset_fkey"
+          ]
+        },
+        {
+          "outbound": [
+            "isa",
+            "dataset_project_fkey"
+          ]
+        },
+        {
+          "outbound": [
+            "isa",
+            "project_groups_fkey"
+          ]
+        },
+        "groups"
+    ],
+    "projection_type": "acl"
+}
+"""
+
+image_annotation_include = """
+        {
+          "outbound": [
+            "Imaging",
+            "Image_Annotation_Image_fkey"
+          ]
+        },
+"""
+
+image_annotation_file_include = """
+        {
+          "outbound": [
+            "Imaging",
+            "Image_Annotation_File_Image_fkey"
+          ]
+        },
+"""
+
+processed_image_include = """
+        {
+          "outbound": [
+            "Imaging",
+            "Processed_Image_Reference_Image_fkey"
+          ]
+        },
+"""
+
+image_z_include = """
+        {
+          "outbound": [
+            "Imaging",
+            "Image_Z_Image_fkey"
+          ]
+        },
+"""
+
+image_channel_include = """
+        {
+          "outbound": [
+            "Imaging",
+            "Image_Channel_Image_fkey"
+          ]
+        },
+"""
+
+image_dataset_suppl_released_guard = literal_eval(dataset_suppl_released_guard.replace('%INCLUDE%', '').replace('writers', str(writers)))
+image_dataset_suppl_edit_guard = literal_eval(dataset_suppl_edit_guard.replace('%INCLUDE%', '').replace('writers', str(writers)))
+
+image_annotation_dataset_suppl_released_guard = literal_eval(dataset_suppl_released_guard.replace('%INCLUDE%', image_annotation_include).replace('writers', str(writers)))
+image_annotation_dataset_suppl_edit_guard = literal_eval(dataset_suppl_edit_guard.replace('%INCLUDE%', image_annotation_include).replace('writers', str(writers)))
+
+image_annotation_file_dataset_suppl_released_guard = literal_eval(dataset_suppl_released_guard.replace('%INCLUDE%', image_annotation_file_include).replace('writers', str(writers)))
+image_annotation_file_dataset_suppl_edit_guard = literal_eval(dataset_suppl_edit_guard.replace('%INCLUDE%', image_annotation_file_include).replace('writers', str(writers)))
+
+processed_image_dataset_suppl_released_guard = literal_eval(dataset_suppl_released_guard.replace('%INCLUDE%', processed_image_include).replace('writers', str(writers)))
+processed_image_dataset_suppl_edit_guard = literal_eval(dataset_suppl_edit_guard.replace('%INCLUDE%', processed_image_include).replace('writers', str(writers)))
+
+image_z_dataset_suppl_released_guard = literal_eval(dataset_suppl_released_guard.replace('%INCLUDE%', image_z_include).replace('writers', str(writers)))
+image_z_dataset_suppl_edit_guard = literal_eval(dataset_suppl_edit_guard.replace('%INCLUDE%', image_z_include).replace('writers', str(writers)))
+
+image_channel_dataset_suppl_released_guard = literal_eval(dataset_suppl_released_guard.replace('%INCLUDE%', image_channel_include).replace('writers', str(writers)))
+image_channel_dataset_suppl_edit_guard = literal_eval(dataset_suppl_edit_guard.replace('%INCLUDE%', image_channel_include).replace('writers', str(writers)))
+
+image_acl_bindings = {"dataset_suppl_released_guard": image_dataset_suppl_released_guard,
+                      "dataset_suppl_edit_guard": image_dataset_suppl_edit_guard
+}
+
+image_annotation_acl_bindings = {"dataset_suppl_released_guard": image_annotation_dataset_suppl_released_guard,
+                      "dataset_suppl_edit_guard": image_annotation_dataset_suppl_edit_guard
+}
+
+image_annotation_file_acl_bindings = {"dataset_suppl_released_guard": image_annotation_file_dataset_suppl_released_guard,
+                      "dataset_suppl_edit_guard": image_annotation_file_dataset_suppl_edit_guard
+}
+
+processed_image_acl_bindings = {"dataset_suppl_released_guard": processed_image_dataset_suppl_released_guard,
+                      "dataset_suppl_edit_guard": processed_image_dataset_suppl_edit_guard
+}
+
+image_z_acl_bindings = {"dataset_suppl_released_guard": image_z_dataset_suppl_released_guard,
+                      "dataset_suppl_edit_guard": image_z_dataset_suppl_edit_guard
+}
+
+image_channel_acl_bindings = {"dataset_suppl_released_guard": image_channel_dataset_suppl_released_guard,
+                      "dataset_suppl_edit_guard": image_channel_dataset_suppl_edit_guard
+}
+
+def add_annotation_visible_foreign_keys(catalog, schema_name, table_name, value):
     model = catalog.getCatalogModel()
     schema = model.schemas[schema_name]
     if table_name in schema.tables:
@@ -28,7 +205,7 @@ def add_annotation(catalog, schema_name, table_name, value):
             model.apply()
             return
     
-def drop_annotation(catalog, schema_name, table_name, value):
+def drop_annotation_foreign_keys(catalog, schema_name, table_name, value):
     model = catalog.getCatalogModel()
     schema = model.schemas[schema_name]
     if table_name in schema.tables:
@@ -44,6 +221,52 @@ def drop_annotation(catalog, schema_name, table_name, value):
                     return
                 else:
                     i +=1
+    
+def add_annotation_visible_columns(catalog, schema_name, table_name, value):
+    model = catalog.getCatalogModel()
+    schema = model.schemas[schema_name]
+    if table_name in schema.tables:
+        table = schema.tables[table_name]
+        visible_columns = table.annotations['tag:isrd.isi.edu,2016:visible-columns']
+        changed = False
+        if value not in visible_columns['detailed']:
+            visible_columns['detailed'].append(value)
+            changed = True
+        if value not in visible_columns['entry']:
+            visible_columns['entry'].append(value)
+            changed = True
+        if changed == True:
+            print('Applying visible-columns annotation: {}'.format(value))
+            model.apply()
+    
+def drop_annotation_columns(catalog, schema_name, table_name, value):
+    model = catalog.getCatalogModel()
+    schema = model.schemas[schema_name]
+    if table_name in schema.tables:
+        table = schema.tables[table_name]
+        visible_columns = table.annotations['tag:isrd.isi.edu,2016:visible-columns']
+        changed = False
+        if value in visible_columns['detailed']:
+            i = 0
+            for visible_column in visible_columns['detailed']:
+                if visible_column == value:
+                    del visible_columns['detailed'][i]
+                    changed = True
+                    break
+                else:
+                    i +=1
+        if value in visible_columns['entry']:
+            i = 0
+            for visible_column in visible_columns['entry']:
+                if visible_column == value:
+                    del visible_columns['entry'][i]
+                    changed = True
+                    break
+                else:
+                    i +=1
+        if changed == True:
+            print('Dropping visible-columns annotation: {}'.format(value))
+            model.apply()
     
 def drop_primary_key_if_exist(catalog, schema_name, table_name, unique_columns):
     model = catalog.getCatalogModel()
@@ -99,7 +322,8 @@ def drop_schema_if_exist(catalog, schema_name):
 Restore the database to the previous status.
 """
 def restore(catalog):
-    drop_annotation(catalog, 'isa', 'imaging_data', ['Imaging', 'Image_Primary_Table_imaging_data_RID_fkey'])
+    drop_annotation_foreign_keys(catalog, 'isa', 'imaging_data', ['Imaging', 'Image_Primary_Table_imaging_data_RID_fkey'])
+    drop_annotation_columns(catalog, 'isa', 'imaging_data', ['isa', 'imaging_data_processing_status_fkey'])
 
     drop_foreign_key_if_exist(catalog, 'isa', 'imaging_data', ['processing_status'])
     
@@ -301,6 +525,8 @@ def create_processed_image_table_if_not_exists(catalog, schema_name):
             fkey_defs=fkey_defs,
             comment=comment,
             annotations=annotations,
+            acls=table_acls,
+            acl_bindings=processed_image_acl_bindings,
             provide_system=True
         )
         
@@ -432,6 +658,8 @@ def create_image_channel_table_if_not_exists(catalog, schema_name):
             fkey_defs=fkey_defs,
             comment=comment,
             annotations=annotations,
+            acls=table_acls,
+            acl_bindings=image_channel_acl_bindings,
             provide_system=True
         )
         
@@ -520,6 +748,8 @@ def create_image_z_table_if_not_exists(catalog, schema_name):
             fkey_defs=fkey_defs,
             annotations=annotations,
             comment=comment,
+            acls=table_acls,
+            acl_bindings=image_z_acl_bindings,
             provide_system=True
         )
         
@@ -796,6 +1026,8 @@ def create_image_annotation_file_table_if_not_exists(catalog, schema_name):
             fkey_defs=fkey_defs,
             comment=comment,
             annotations=table_annotations,
+            acls=table_acls,
+            acl_bindings=image_annotation_file_acl_bindings,
             provide_system=True
         )
         
@@ -1044,6 +1276,8 @@ def create_image_annotation_table_if_not_exists(catalog, schema_name):
             fkey_defs=fkey_defs,
             comment=comment,
             annotations=table_annotations,
+            acls=table_acls,
+            acl_bindings=image_annotation_acl_bindings,
             provide_system=True
         )
         
@@ -1567,6 +1801,8 @@ def create_image_table_if_not_exists(catalog, schema_name):
             fkey_defs=fkey_defs,
             comment=comment,
             annotations=table_annotations,
+            acls=table_acls,
+            acl_bindings=image_acl_bindings,
             provide_system=True
         )
         
@@ -1582,33 +1818,10 @@ def create_Imaging_schema_if_not_exists(catalog):
         }
     }
     
-    acls = {
-      "delete": [
-        "https://auth.globus.org/8438a12e-6589-11e7-9091-22000b500e8d",
-        "https://dev.facebase.org/webauthn_robot/fb_cron",
-        "https://staging.facebase.org/webauthn_robot/fb_cron",
-        "https://www.facebase.org/webauthn_robot/fb_cron"
-      ],
-      "insert": [
-        "https://www.facebase.org/webauthn_robot/fb_cron",
-        "https://auth.globus.org/8438a12e-6589-11e7-9091-22000b500e8d",
-        "https://dev.facebase.org/webauthn_robot/fb_cron",
-        "https://staging.facebase.org/webauthn_robot/fb_cron",
-        "https://auth.globus.org/01c7bf28-2622-11e7-9ad7-22000b74c0b7"
-      ],
-      "update": [
-        "https://auth.globus.org/8438a12e-6589-11e7-9091-22000b500e8d",
-        "https://dev.facebase.org/webauthn_robot/fb_cron",
-        "https://staging.facebase.org/webauthn_robot/fb_cron",
-        "https://www.facebase.org/webauthn_robot/fb_cron"
-      ]
-    }
-
-
     schema_name = 'Imaging'
     model = catalog.getCatalogModel()
     if schema_name not in model.schemas:
-        schema_def = Schema.define(schema_name, acls=acls, annotations=annotations)
+        schema_def = Schema.define(schema_name, acls=schema_acls, annotations=annotations)
         model.create_schema(schema_def)
 
 parser = argparse.ArgumentParser()
@@ -1679,7 +1892,7 @@ create_image_annotation_table_if_not_exists(catalog_ermrest, 'Imaging')
 Add columns to the imaging_data table.
 """
 print('Adding columns to the imaging_data table ...')
-add_column_if_not_exist(catalog_ermrest, 'isa', 'imaging_data', 'processing_status', 'text', None, True)
+add_column_if_not_exist(catalog_ermrest, 'isa', 'imaging_data', 'processing_status', 'text', 'new', True)
 
 """
 Create Foreign Keys.
@@ -1688,10 +1901,13 @@ print('Adding FK to the imaging_data table ...')
 create_foreign_key_if_not_exist(catalog_ermrest, 'isa', 'imaging_data', ['processing_status'], 'vocab', 'processing_status', ['Name'])
 
 """
-Create visible columns annotations.
+Create visible annotations.
 """
+print('Adding the visible foreign keys annotations ...')
+add_annotation_visible_foreign_keys(catalog_ermrest, 'isa', 'imaging_data', ['Imaging', 'Image_Primary_Table_imaging_data_RID_fkey'])
+
 print('Adding the visible columns annotations ...')
-add_annotation(catalog_ermrest, 'isa', 'imaging_data', ['Imaging', 'Image_Primary_Table_imaging_data_RID_fkey'])
+add_annotation_visible_columns(catalog_ermrest, 'isa', 'imaging_data', ['isa', 'imaging_data_processing_status_fkey'])
 
 print('End of schema updates')
 
