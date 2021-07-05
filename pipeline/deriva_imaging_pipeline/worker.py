@@ -416,7 +416,7 @@ class DerivaImagingWorker (object):
                                   rid,
                                   [self.model['processing_status']],
                                   {'RID': rid,
-                                  self.model['processing_status']: 'HATRAC GET ERROR'
+                                  self.model['processing_status']: 'error'
                                   })
             
             self.logger.debug('Hatrac error') 
@@ -439,7 +439,7 @@ class DerivaImagingWorker (object):
                                   rid,
                                   [self.model['processing_status']],
                                   {'RID': rid,
-                                  self.model['processing_status']: 'CONVERT ERROR'
+                                  self.model['processing_status']: 'error'
                                   })
             self.logger.debug('convert2pyramid error') 
             return 1
@@ -479,7 +479,7 @@ class DerivaImagingWorker (object):
                                   rid,
                                   [self.model['processing_status']],
                                   {'RID': rid,
-                                  self.model['processing_status']: 'HTTP ERROR'
+                                  self.model['processing_status']: 'error'
                                   })
             return 1
         
@@ -498,7 +498,7 @@ class DerivaImagingWorker (object):
                                   rid,
                                   [self.model['processing_status']],
                                   {'RID': rid,
-                                  self.model['processing_status']: 'GET THUMBNAIL ERROR'
+                                  self.model['processing_status']: 'error'
                                   })
             return 1
         
@@ -520,7 +520,7 @@ class DerivaImagingWorker (object):
                                  rid,
                                  [self.model['processing_status']],
                                  {'RID': rid,
-                                  self.model['processing_status']: error_name
+                                  self.model['processing_status']: 'error'
                                  })
             return 1
             
@@ -531,7 +531,7 @@ class DerivaImagingWorker (object):
         """
         obj = {}
         obj['RID'] = rid
-        obj[self.model['processing_status']] = 'MISSING_SCENES_WARNING' if self.missing_scenes == True else 'success'
+        obj[self.model['processing_status']] = 'error' if self.missing_scenes == True else 'success'
         columns = [self.model['processing_status']]
 
         self.updateAttributes(self.model['primary_schema'],

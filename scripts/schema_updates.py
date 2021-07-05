@@ -349,18 +349,20 @@ def create_vocabulary_table_if_not_exist(catalog, schema_name, table_name, comme
 
 def add_rows_to_vocab_processing_status(catalog):
 
+    """
+    {'Name': 'HATRAC GET ERROR', 'Description': 'An error occurred during a hatrac operation.'},
+    {'Name': 'CONVERT ERROR', 'Description': 'An error occurred during the image conversion.'},
+    {'Name': 'HTTP ERROR', 'Description': 'An HTTP error occurred.'},
+    {'Name': 'GET THUMBNAIL ERROR', 'Description': 'The thumbnail image could not be retrieved from the image server.'},
+    {'Name': 'GET TIFF URL ERROR', 'Description': 'The TIFF image could not be retrieved from the image server.'},
+    {'Name': 'MISSING_SCENES_WARNING', 'Description': 'The TIFF image has no real scenes.'}
+    """
     rows =[
         {'Name': 'new', 'Description': 'A new record was created. It will trigger the processing.'},
         {'Name': 'renew', 'Description': 'The processing will be re-executed.'},
         {'Name': 'success', 'Description': 'The processing was successfully.'},
         {'Name': 'in progress', 'Description': 'The process was started.'},
-        {'Name': 'error', 'Description': 'Generic error.'},
-        {'Name': 'HATRAC GET ERROR', 'Description': 'An error occurred during a hatrac operation.'},
-        {'Name': 'CONVERT ERROR', 'Description': 'An error occurred during the image conversion.'},
-        {'Name': 'HTTP ERROR', 'Description': 'An HTTP error occurred.'},
-        {'Name': 'GET THUMBNAIL ERROR', 'Description': 'The thumbnail image could not be retrieved from the image server.'},
-        {'Name': 'GET TIFF URL ERROR', 'Description': 'The TIFF image could not be retrieved from the image server.'},
-        {'Name': 'MISSING_SCENES_WARNING', 'Description': 'The TIFF image has no real scenes.'}
+        {'Name': 'error', 'Description': 'Generic error.'}
     ]
     pb = catalog.getPathBuilder()
     schema = pb.vocab
