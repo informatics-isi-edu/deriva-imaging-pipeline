@@ -36,6 +36,27 @@ schema_acls = isa_curation_policy
 restricted_visibility_policy = {"select": curators}
 table_acls = restricted_visibility_policy
 
+source_definitions = {
+    "columns": True,
+    "fkeys": True,
+    "sources": {
+        "imaging_rows": {
+            "source": [{"inbound": ["Imaging", "Image_Primary_Table_imaging_data_RID_fkey"]}, "RID"],
+            "entity": True,
+            "aggregate": "array_d"
+        }
+    }
+}
+
+virtual_column = {
+   "markdown_name": "Image",
+   "display": {
+       "wait_for": ["imaging_rows"],
+       "template_engine": "handlebars",
+       "markdown_pattern": "{{#if (eq processing_status \"success\")}} {{#each imaging_rows}}{{#if this.values.Generated_Zs}}::: iframe [](/chaise/viewer/#1/Imaging:Image/RID={{#encode this.values.RID}}{{/encode}}){width=1000 height=1000} \n:::{{else}}Multi Scenes{{/if}}{{/each}}{{else}}Unprocessed{{/if}}"
+   }
+ }
+
 dataset_suppl_released_guard = """
 {
     "types": [
@@ -193,6 +214,16 @@ image_channel_acl_bindings = {"dataset_suppl_released_guard": image_channel_data
                       "dataset_suppl_edit_guard": image_channel_dataset_suppl_edit_guard
 }
 
+def add_annotation_source_definitions(catalog, schema_name, table_name, value):
+    model = catalog.getCatalogModel()
+    schema = model.schemas[schema_name]
+    if table_name in schema.tables:
+        table = schema.tables[table_name]
+        table.annotations['tag:isrd.isi.edu,2019:source-definitions'] = value
+        print('Applying source-definitions annotation: {}'.format(value))
+        model.apply()
+        return
+    
 def add_annotation_visible_foreign_keys(catalog, schema_name, table_name, value):
     model = catalog.getCatalogModel()
     schema = model.schemas[schema_name]
@@ -324,6 +355,8 @@ Restore the database to the previous status.
 def restore(catalog):
     drop_annotation_foreign_keys(catalog, 'isa', 'imaging_data', ['Imaging', 'Image_Primary_Table_imaging_data_RID_fkey'])
     drop_annotation_columns(catalog, 'isa', 'imaging_data', ['isa', 'imaging_data_processing_status_fkey'])
+    drop_annotation_columns(catalog, 'isa', 'imaging_data', virtual_column)
+    add_annotation_source_definitions(catalog, 'isa', 'imaging_data', None)
 
     drop_foreign_key_if_exist(catalog, 'isa', 'imaging_data', ['processing_status'])
     
@@ -1905,11 +1938,15 @@ create_foreign_key_if_not_exist(catalog_ermrest, 'isa', 'imaging_data', ['proces
 """
 Create visible annotations.
 """
+print('Adding the source definition annotations ...')
+add_annotation_source_definitions(catalog_ermrest, 'isa', 'imaging_data', source_definitions)
+
 print('Adding the visible foreign keys annotations ...')
 add_annotation_visible_foreign_keys(catalog_ermrest, 'isa', 'imaging_data', ['Imaging', 'Image_Primary_Table_imaging_data_RID_fkey'])
 
 print('Adding the visible columns annotations ...')
 add_annotation_visible_columns(catalog_ermrest, 'isa', 'imaging_data', ['isa', 'imaging_data_processing_status_fkey'])
+add_annotation_visible_columns(catalog_ermrest, 'isa', 'imaging_data', virtual_column)
 
 print('End of schema updates')
 
