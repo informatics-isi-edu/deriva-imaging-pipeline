@@ -53,7 +53,7 @@ virtual_column = {
    "display": {
        "wait_for": ["imaging_rows"],
        "template_engine": "handlebars",
-       "markdown_pattern": "{{#if (eq processing_status \"success\")}} {{#each imaging_rows}}{{#if this.values.Generated_Zs}}::: iframe [](/chaise/viewer/#1/Imaging:Image/RID={{#encode this.values.RID}}{{/encode}}){width=1000 height=1000} \n:::{{else}}Multi Scenes{{/if}}{{/each}}{{else}}Unprocessed{{/if}}"
+       "markdown_pattern": "{{#if (eq processing_status \"success\")}} {{#each imaging_rows}}{{#if this.values.Generated_Zs}}::: iframe [](/chaise/viewer/#1/Imaging:Image/RID={{#encode this.values.RID}}{{/encode}}){width=1000 height=1000} \n:::{{else}}Multi Scenes{{/if}}{{/each}}{{else}}Unavailable{{/if}}"
    }
  }
 
