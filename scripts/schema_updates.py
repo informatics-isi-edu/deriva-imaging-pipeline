@@ -337,6 +337,8 @@ def drop_column_if_exist(catalog, schema_name, table_name, column_name):
 
 def drop_table_if_exist(catalog, schema_name, table_name):
     model = catalog.getCatalogModel()
+    if schema_name not in model.schemas:
+        return
     schema = model.schemas[schema_name]
     if table_name in schema.tables.keys():
         print('Dropping table {}:{}'.format(schema_name, table_name))
@@ -1862,15 +1864,14 @@ def create_Imaging_schema_if_not_exists(catalog):
 parser = argparse.ArgumentParser()
 parser.add_argument('hostname')
 parser.add_argument('catalog_number')
-parser.add_argument('credential_file')
+parser.add_argument('--credential_file')
 
 args = parser.parse_args()
 
 hostname = args.hostname
 catalog_number = args.catalog_number
-credential_file = args.credential_file
 
-credentials = get_credential(args.hostname, args.credential_file)
+credentials = get_credential(args.hostname, args.credential_file) if 'credential_file' in args else get_credential(args.hostname)
 catalog_ermrest = ErmrestCatalog('https', hostname, catalog_number, credentials=credentials)
 catalog_ermrest.dcctx['cid'] = 'model'
 
