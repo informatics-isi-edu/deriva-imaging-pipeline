@@ -240,7 +240,7 @@ class DerivaImagingWorker (object):
         
         if resolution == 0:
             self.logger.debug('No resolution found for file "%s".' % (filename)) 
-            self.sendMail('WARNING IMAGE PROCESSING: NO RESOLUTION', 'RID: %s\nCan not find resolution for file "%s".' % (rid, filename))
+            #self.sendMail('WARNING IMAGE PROCESSING: NO RESOLUTION', 'RID: %s\nCan not find resolution for file "%s".' % (rid, filename))
         return resolution
             
     """
