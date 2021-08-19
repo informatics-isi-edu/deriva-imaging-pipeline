@@ -343,20 +343,21 @@ class DerivaImagingWorker (object):
         Check if the primary image has a thumbnail uploaded by the user:
         
         """
-        self.primary_thumbnail = self.model.get('primary_file_thumbnail')
-        if self.primary_thumbnail != None:
+        self.primary_thumbnail = None
+        self.primary_file_thumbnail = self.model.get('primary_file_thumbnail')
+        if self.primary_file_thumbnail != None:
             """
             Query for detecting if the primary image has a thumbnail uploaded by the user:
             
-            /entity/{primary_schema}:{primary_table}/RID={rid}/self.primary_thumbnail
+            /entity/{primary_schema}:{primary_table}/RID={rid}/self.primary_file_thumbnail
             
             """
-            url = '/attribute/{}:{}/RID={}/{}'.format(urlquote(self.model['primary_schema']), urlquote(self.model['primary_table']), urlquote(rid), self.primary_thumbnail)
+            url = '/attribute/{}:{}/RID={}/{}'.format(urlquote(self.model['primary_schema']), urlquote(self.model['primary_table']), urlquote(rid), self.primary_file_thumbnail)
             self.logger.debug('Primary thumbnail query URL: "{}"'.format(url)) 
             resp = self.catalog.get(url)
             resp.raise_for_status()
             if len(resp.json()) > 0:
-                primary_thumbnail_column = self.primary_thumbnail.split('/')[-1]
+                primary_thumbnail_column = self.primary_file_thumbnail.split('/')[-1]
                 self.primary_thumbnail = resp.json()[0][primary_thumbnail_column]
         self.logger.debug('Primary thumbnail value: "{}"'.format(self.primary_thumbnail)) 
 
