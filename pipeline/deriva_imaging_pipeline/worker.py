@@ -1084,7 +1084,7 @@ class DerivaImagingWorker (object):
                                              'Pixels_Per_Meter', 
                                              'OME_XML_URL', 'OME_XML_Name', 'OME_XML_Bytes', 'OME_XML_MD5'],
                                             {'RID': scenes[str(serie)],
-                                            'Thumbnail_URL': thumbnail_url if self.primary_thumbnail == None else None,
+                                            'Thumbnail_URL': thumbnail_url,
                                             'Default_Z': middle_z_index,
                                             'Download_Tiff_URL': download_tiff_url,
                                             'Download_Tiff_Name': download_tiff_file_name,
