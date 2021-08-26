@@ -14,7 +14,7 @@
     "loglevel": "debug",
     "image_processing_status": "processing_status",
     "original_file_name": "filename",
-    "get_claimable_url": "/entity/isa:imaging_data/processing_status=new;processing_status=renew/filename::ciregexp::%5B.%5Dtif%5Bf%5D%7B0%2C1%7D%24?limit=1",
+    "get_claimable_url": "/entity/isa:imaging_data/processing_status=new;processing_status=renew/filename::ciregexp::%5B.%5D%28tif%5Bf%5D%7B0%2C1%7D%7Cjpg%29%24?limit=1",
     "put_claim_url": "/attributegroup/isa:imaging_data/RID;processing_status",
     "put_update_baseurl": "/attributegroup/isa:imaging_data/RID",
     "deriva_imaging_server": "dev.facebase.org",
