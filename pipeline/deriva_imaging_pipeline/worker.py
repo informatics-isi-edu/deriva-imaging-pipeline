@@ -106,7 +106,7 @@ class DerivaImagingWorker (object):
         self.curl = kwargs.get('curl')
         self.wget = kwargs.get('wget')
         self.cookie = kwargs.get('cookie')
-        self.host_server = socket.gethostname()
+        self.host_server = os.getenv('DERIVA_PIPELINE_HOSTNAME', socket.gethostname())
         self.hatrac_store = HatracStore(
             self.scheme, 
             self.host,
@@ -134,6 +134,7 @@ class DerivaImagingWorker (object):
     Send email notification
     """
     def sendMail(self, subject, text):
+        self.mail_relay = False
         if self.mail_server and self.mail_sender and self.mail_receiver and self.mail_relay == True:
             """
             Send the mail with the ISI relay.isi.edu SMTP server
@@ -260,7 +261,7 @@ class DerivaImagingWorker (object):
         Inherit columns values from the parent and set values for the rest of the columns
         """
         row = {}
-        row[self.model['processing_status']] = 'success'
+        #row[self.model['processing_status']] = 'success'
         row['Parent_Image'] = rid
         if self.resolutions != None and len(self.resolutions) > 0:
             row['Pixels_Per_Meter'] = self.resolutions[0]
@@ -576,7 +577,7 @@ class DerivaImagingWorker (object):
     Generate the thumbnail pattern
     """
     def getThumbnailPattern(self):
-        thumbnail_pattern = '/iiif/2/%s/full/,150/0/default.jpg' 
+        thumbnail_pattern = '/iiif/2/%s/full/,100/0/default.jpg' 
         return thumbnail_pattern
             
     """
@@ -1289,7 +1290,7 @@ class DerivaImagingWorker (object):
         for file_name in self.tiff_images:
             file_path = '/var/www/html/%s%s%s' % (self.images, os.sep, file_name)
             if os.path.isfile(file_path):
-                args = [self.curl, '-s', '-k', '-w', '%{http_code}', '-o', '/dev/null', '{}/{}/full/,150/0/default.jpg'.format(self.iiif_url, urlquote('https://{}/{}/{}'.format(self.host_server, self.images, urlquote(file_name))))]
+                args = [self.curl, '-s', '-k', '-w', '%{http_code}', '-o', '/dev/null', '{}/{}/full/,100/0/default.jpg'.format(self.iiif_url, urlquote('https://{}/{}/{}'.format(self.host_server, self.images, urlquote(file_name))))]
                 try:
                     self.logger.debug('Executing:\n%s' % (' '.join(args)))
                     p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
