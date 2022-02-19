@@ -1,0 +1,18 @@
+
+[Unit]
+Description=Deriva Imaging Pipeline Service
+
+[Service]
+Environment="DERIVA_IMAGING_POLL_SECONDS=300" "DERIVA_PIPELINE_HOSTNAME=iiif-dev.isi.edu"
+ExecStart=/usr/local/bin/deriva-imaging-server --config /home/serban/deriva_imaging/config/deriva_imaging_www.json
+RestartSec=60
+Restart=always
+KillMode=mixed
+TimeoutStopSec=60
+User=serban
+Nice=19
+IOSchedulingClass=idle
+
+[Install]
+WantedBy=multi-user.target
+
