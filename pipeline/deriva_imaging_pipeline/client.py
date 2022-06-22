@@ -153,12 +153,8 @@ def get_configuration(cfg, logger):
 
     config['output_metadata'] = output_metadata
 
-    extract_scenes = cfg.get('extract_scenes', None)
-    if not extract_scenes or not os.path.isfile(extract_scenes):
-        logger.error('The "extract_scenes.py" application must be provided in the configuration file and exist.')
-        return None
-
-    config['extract_scenes'] = extract_scenes
+    processing_dir = cfg.get('processing_dir', None)
+    config['processing_dir'] = processing_dir
 
     model_file = cfg.get('model_file', None)
     if not model_file or not os.path.isfile(model_file):
