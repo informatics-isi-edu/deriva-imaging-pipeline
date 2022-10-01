@@ -3,9 +3,11 @@ Tools and configuration for the DERIVA imaging pipeline
 
 # Installation
 
+```
 git clone https://github.com/informatics-isi-edu/deriva-imaging-pipeline.git
 cd deriva-imaging-pipeline/pipeline/deriva-imaging-pipeline
 pip3 install --upgrade --no-deps .
+```
 
 # Running
 
