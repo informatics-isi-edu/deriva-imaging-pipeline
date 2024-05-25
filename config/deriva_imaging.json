@@ -1,8 +1,8 @@
 {
-    "baseuri": "https://dev.facebase.org/ermrest/catalog/1",
+    "baseuri": "https://www.facebase.org/ermrest/catalog/1",
     "python": "/usr/bin/python3",
-    "extract_scenes": "/home/foo/deriva_imaging/tools/extract_scenes.py",
-    "data_scratch": "/var/scratch/hatrac",
+    "processing_dir": "/var/www/data/scratch",
+    "data_scratch": "/var/www/data/scratch",
     "curl": "/usr/bin/curl",
     "wget": "/usr/bin/wget",
     "tiffinfo": "/usr/bin/tiffinfo",
@@ -10,23 +10,23 @@
     "images": "ome/data",
     "output_metadata": "ome/metadata",
     "viewer": "openseadragon-viewer/mview.html",
-    "log": "/home/foo/deriva_imaging/logs/deriva_imaging.log",
+    "log": ".../logs/deriva_imaging.log",
     "loglevel": "debug",
     "image_processing_status": "processing_status",
     "original_file_name": "filename",
-    "get_claimable_url": "/entity/isa:imaging_data/processing_status=new;processing_status=renew/filename::ciregexp::%5B.%5D%28tif%5Bf%5D%7B0%2C1%7D%7Cjpg%29%24?limit=1",
+    "get_claimable_url": "/entity/isa:imaging_data/processing_status=new;processing_status=renew/filename::ciregexp::%5B.%5D%28tif%5Bf%5D%7B0%2C1%7D%7Cjpg%7Cpng%7Cnii%28%5B.%5Dgz%29%7B0%2C1%7D%7Caim%7Cmnc%7Cam%29%24?limit=1",
     "put_claim_url": "/attributegroup/isa:imaging_data/RID;processing_status",
     "put_update_baseurl": "/attributegroup/isa:imaging_data/RID",
-    "deriva_imaging_server": "dev.facebase.org",
-    "credentials_file": "/home/foo/.deriva/credential.json",
+    "deriva_imaging_server": "www.facebase.org",
+    "credentials_file": ".../credential.json",
     "catalog_number": "1",
     "hatrac_template": "/hatrac/facebase/data/fb3/{dataset}/{replicate}/proc_img",
     "iiif_url": "https://deriva-imaging.isi.edu:8183/iiif/2",
-    "model_file": "/home/foo/deriva_imaging/config/model.json",
+    "model_file": "/home/serban/deriva_imaging/config/model.json",
     "mail_server": "relay.isi.edu",
     "mail_sender": "DERIVA IMAGING Online Notification <no_reply@isi.edu>",
-    "mail_receiver": "foo@isi.edu",
-    "mail_file": "/home/foo/deriva_imaging/logs/mail.log"
+    "mail_receiver": "foo.org",
+    "mail_file": "/home/serban/deriva_imaging/logs/mail.log"
 }
 
 
