@@ -1,18 +1,18 @@
-
 [Unit]
 Description=Deriva Imaging Pipeline Service
+ConditionPathExists=/home/ENTER_USERNAME/deriva_imaging
+After=network.target
 
 [Service]
-Environment="DERIVA_IMAGING_POLL_SECONDS=300" "DERIVA_PIPELINE_HOSTNAME=pipeline.facebase.org"
-ExecStart=/usr/local/bin/deriva-imaging-server --config /home/serban/deriva_imaging/config/deriva_imaging_www.json
+Environment="DERIVA_IMAGING_POLL_SECONDS=300" "DERIVA_PIPELINE_HOSTNAME=ENTER_HOSTNAME"
+ExecStart=/usr/local/bin/deriva-imaging-server --config /home/ENTER_USERNAME/deriva_imaging/config/deriva_imaging_www.json
 RestartSec=60
 Restart=always
 KillMode=mixed
 TimeoutStopSec=60
-User=serban
+User=ENTER_USERNAME
 Nice=19
 IOSchedulingClass=idle
 
 [Install]
 WantedBy=multi-user.target
-
