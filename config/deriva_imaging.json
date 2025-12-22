@@ -1,5 +1,5 @@
 {
-    "baseuri": "https://www.facebase.org/ermrest/catalog/1",
+    "baseuri": "https://ENTER_HOSTNAME/ermrest/catalog/1",
     "python": "/usr/bin/python3",
     "processing_dir": "/var/www/data/scratch",
     "data_scratch": "/var/www/data/scratch",
@@ -17,16 +17,14 @@
     "get_claimable_url": "/entity/isa:imaging_data/processing_status=new;processing_status=renew/filename::ciregexp::%5B.%5D%28tif%5Bf%5D%7B0%2C1%7D%7Cjpg%7Cpng%7Cnii%28%5B.%5Dgz%29%7B0%2C1%7D%7Caim%7Cmnc%7Cam%29%24?limit=1",
     "put_claim_url": "/attributegroup/isa:imaging_data/RID;processing_status",
     "put_update_baseurl": "/attributegroup/isa:imaging_data/RID",
-    "deriva_imaging_server": "www.facebase.org",
+    "deriva_imaging_server": "ENTER_HOSTNAME",
     "credentials_file": ".../credential.json",
     "catalog_number": "1",
-    "hatrac_template": "/hatrac/facebase/data/fb3/{dataset}/{replicate}/proc_img",
-    "iiif_url": "https://deriva-imaging.isi.edu:8183/iiif/2",
-    "model_file": "/home/serban/deriva_imaging/config/model.json",
-    "mail_server": "relay.isi.edu",
-    "mail_sender": "DERIVA IMAGING Online Notification <no_reply@isi.edu>",
-    "mail_receiver": "foo.org",
-    "mail_file": "/home/serban/deriva_imaging/logs/mail.log"
+    "hatrac_template": "/hatrac/EXAMPLE/data/fb3/{dataset}/{replicate}/proc_img",
+    "iiif_url": "https://ENTER_HOSTNAME:8183/iiif/2",
+    "model_file": "/home/ENTER_USERNAME/deriva_imaging/config/model.json",
+    "mail_server": "ENTER_HOSTNAME",
+    "mail_sender": "DERIVA IMAGING Online Notification <ENTER_EMAIL_ADDRESS>",
+    "mail_receiver": "ENTER_HOSTNAME",
+    "mail_file": "/home/ENTER_USERNAME/deriva_imaging/logs/mail.log"
 }
-
-
