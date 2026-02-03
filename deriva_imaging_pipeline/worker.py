@@ -1,54 +1,73 @@
 #!/usr/bin/python
-# 
+"""DERIVA Imaging Pipeline worker for processing microscopy images.
+
+This module provides the DerivaImagingWorker class which handles the
+complete image processing pipeline:
+
+1. Download source image from Hatrac
+2. Convert to tiled pyramidal TIFF using imagetools
+3. Upload processed files to Hatrac
+4. Update DERIVA catalog with metadata and URLs
+
+The worker integrates with:
+- DERIVA ERMrest catalog for metadata management
+- Hatrac object store for file storage
+- imagetools for image conversion
+- IIIF image server for tile delivery
+
+Example:
+    >>> from deriva_imaging_pipeline.worker import DerivaImagingWorker
+    >>> worker = DerivaImagingWorker(config)
+    >>> result = worker.processImage("1-ABCD")
+"""
+
+#
 # Copyright 2017 University of Southern California
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #    http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-"""
-Client for generating tiled pyramid.
-"""
 
-import os
+from __future__ import annotations
+
+import hashlib
+import json
+import logging
+import math
+import mimetypes
+import re
+import shutil
+import smtplib
+import socket
 import stat
 import subprocess
-import json
-from urllib.parse import urlparse
 import sys
-import traceback
-import time
-import shutil
-import hashlib
-import smtplib
-from email.mime.text import MIMEText
-import socket
-from dateutil.parser import parse
-from lxml.etree import XMLSyntaxError
-from lxml import etree
-from socket import gaierror, EAI_AGAIN
-import mimetypes
 import tempfile
+import time
+import traceback
+import xml.etree.ElementTree as ET
+from email.mime.text import MIMEText
+from http import HTTPStatus
+from typing import Any, Optional
+from urllib.parse import urlparse
 
-from deriva.core import PollingErmrestCatalog, HatracStore, urlquote
+from dateutil.parser import parse
+from deriva.core import HatracStore, PollingErmrestCatalog, urlquote
 from deriva.core.utils import hash_utils as hu
 from deriva.core.utils.core_utils import DEFAULT_CHUNK_SIZE
-
+from lxml import etree
+from lxml.etree import XMLSyntaxError
 from requests.exceptions import HTTPError
-from http import HTTPStatus
-
-import xml.etree.ElementTree as ET
-import re
-import math
-from tifffile import TiffFile, TiffWriter
+from tifffile import TiffFile
 
 from imagetools import extract_scenes
 
@@ -62,11 +81,53 @@ uuid = b'urn:uuid:'
 endTokens = [b'"', b'<']   
 ISI_NETWORK = '128.9' 
 
-class DerivaImagingWorker (object):
-    """Network client for generating tiled pyramid images.
+class DerivaImagingWorker:
+    """Worker for processing microscopy images in the DERIVA pipeline.
+
+    This class handles the complete image processing workflow:
+    - Downloads source images from Hatrac object store
+    - Converts images to tiled pyramidal TIFF format
+    - Uploads processed files back to Hatrac
+    - Updates the DERIVA catalog with metadata
+
+    Attributes:
+        baseuri: Base URI for the DERIVA catalog.
+        hatrac_template: Template for Hatrac object paths.
+        iiif_url: Base URL for the IIIF image server.
+        data_scratch: Directory for temporary processing files.
+        images: Subdirectory for output images.
+        output_metadata: Subdirectory for output metadata.
+        catalog: ERMrest catalog client.
+        hatrac_store: Hatrac object store client.
+        logger: Logger instance for this worker.
     """
 
-    def __init__(self, kwargs):
+    def __init__(self, kwargs: dict[str, Any]) -> None:
+        """Initialize a DerivaImagingWorker.
+
+        Args:
+            kwargs: Configuration dictionary containing:
+                - baseuri: Base URI for the DERIVA catalog
+                - hatrac_template: Template for Hatrac paths
+                - iiif_url: Base URL for IIIF server
+                - data_scratch: Temporary processing directory
+                - images: Output images directory
+                - output_metadata: Output metadata directory
+                - cookie: Authentication cookie
+                - model: Data model configuration
+                - version: Pipeline version string
+                - curl: Path to curl executable
+                - wget: Path to wget executable
+                - tiffinfo: Path to tiffinfo executable
+                - python_app: Path to Python interpreter
+                - viewer: Viewer application path
+                - processing_dir: Optional processing directory
+                - mail_server: Optional mail server hostname
+                - mail_sender: Optional sender email address
+                - mail_receiver: Optional receiver email address
+                - mail_file: Optional file to log mail messages
+                - logger: Logger instance
+        """
         self.missing_scenes = False
         self.z_threshold = os.getenv('z_threshold', 5)
         self.model = kwargs.get('model')
@@ -132,10 +193,15 @@ class DerivaImagingWorker (object):
         self.logger = kwargs.get('logger')
         self.logger.debug('Client initialized.')
 
-    """
-    Send email notification
-    """
-    def sendMail(self, subject, text):
+    def sendMail(self, subject: str, text: str) -> None:
+        """Send email notification about processing status.
+
+        Sends notification via SMTP if configured, otherwise logs to mail file.
+
+        Args:
+            subject: Email subject line.
+            text: Email body text.
+        """
         self.mail_relay = False
         if self.mail_server and self.mail_sender and self.mail_receiver and self.mail_relay == True:
             """
@@ -211,10 +277,18 @@ class DerivaImagingWorker (object):
             os.remove(scriptName)
             os.remove(bodyName)
 
-    """
-    Get the meterScaleInPixels
-    """
-    def getMeterScaleInPixels(self, filename, rid):
+    def getMeterScaleInPixels(self, filename: str, rid: str) -> float:
+        """Get the resolution of an image in pixels per meter.
+
+        Uses tiffinfo to extract resolution metadata from the TIFF file.
+
+        Args:
+            filename: Name of the TIFF file.
+            rid: RID of the image for error reporting.
+
+        Returns:
+            Resolution in pixels per meter, or 0 if not found.
+        """
         path = '/var/www/html/%s/%s' % (self.images, filename)
         resolution = 0
         if filename.endswith('.jpg'):
@@ -246,21 +320,36 @@ class DerivaImagingWorker (object):
             #self.sendMail('WARNING IMAGE PROCESSING: NO RESOLUTION', 'RID: %s\nCan not find resolution for file "%s".' % (rid, filename))
         return resolution
             
-    """
-    Get the channel if any
-    """
-    def getChannel(self, filename, rid):
+    def getChannel(self, filename: str, rid: str) -> Optional[list[int]]:
+        """Get the channel number for a TIFF file.
+
+        Args:
+            filename: Name of the TIFF file.
+            rid: RID of the image (unused, for consistency).
+
+        Returns:
+            List containing the channel number, or None if not found.
+        """
         for tf in self.tiff_files:
             if tf['name'] == filename:
                 return [tf['channel']]
         return None
 
-    """
-    Copy the values that are inhereted from parent image into the scenes
-    """    
-    def getSceneRow(self, parent_row, scene, z_index, z_index_no, rid):
-        """
-        Inherit columns values from the parent and set values for the rest of the columns
+    def getSceneRow(self, parent_row: dict[str, Any], scene: int, z_index: int, z_index_no: int, rid: str) -> dict[str, Any]:
+        """Create a scene row by inheriting values from parent image.
+
+        Copies column values from the parent image and sets scene-specific
+        values like series number, Z index, and generated Z count.
+
+        Args:
+            parent_row: Parent image row from the catalog.
+            scene: Scene/series number.
+            z_index: Default Z index for this scene.
+            z_index_no: Total number of Z indices.
+            rid: RID of the parent image.
+
+        Returns:
+            Dictionary containing the scene row data.
         """
         row = {}
         #row[self.model['processing_status']] = 'success'
@@ -284,19 +373,31 @@ class DerivaImagingWorker (object):
         row['Properties'] = self.tiff_files[scene]['series_properties']
         return row
         
-    """
-    Create a record to be stored into the Image table
-    """    
-    def getImageRow(self, primary_row, rid):
+    def getImageRow(self, primary_row: dict[str, Any], rid: str) -> dict[str, Any]:
+        """Create a row for the Image table from primary table data.
+
+        Args:
+            primary_row: Row from the primary table.
+            rid: RID of the primary record.
+
+        Returns:
+            Dictionary containing the Image table row data.
+        """
         row = {}
         row['Original_File_Name'] = primary_row[self.model['primary_file_name']]
         row['Primary_Table'] = rid
         return row
     
-    """
-    Get the Image Metadata from the pyramid
-    """
-    def getImageMetadata(self, pyramid, rid):
+    def getImageMetadata(self, pyramid: dict[str, Any], rid: str) -> dict[str, Any]:
+        """Extract image metadata from a pyramid structure.
+
+        Args:
+            pyramid: Pyramid dictionary containing series details.
+            rid: RID of the image (unused, for consistency).
+
+        Returns:
+            Dictionary with 'ome' and 'info' keys containing metadata.
+        """
         ret = {
             'ome': pyramid['series_details'],
             'info': {}
@@ -315,13 +416,23 @@ class DerivaImagingWorker (object):
                 
         return ret
 
-    """
-    Main function to process the image
-    """
-    def processImage(self, rid):
+    def processImage(self, rid: str) -> int:
+        """Process an image from the DERIVA catalog.
+
+        Main entry point for image processing. This method:
+        1. Queries the catalog for the image record
+        2. Downloads the source file from Hatrac
+        3. Converts to tiled pyramidal TIFF
+        4. Uploads processed files to Hatrac
+        5. Updates the catalog with metadata and URLs
+
+        Args:
+            rid: RID of the image to process.
+
+        Returns:
+            0 on success, 1 on error.
         """
-        Cleanup the working directories
-        """
+        # Cleanup the working directories
         self.cleanupDataScratch()
         self.removeConvertedFiles()
         
@@ -550,10 +661,17 @@ class DerivaImagingWorker (object):
         
         return 0
         
-    """
-    Extract the file from hatrac
-    """
-    def getHatracFile(self, filename, file_url, rid):
+    def getHatracFile(self, filename: str, file_url: str, rid: str) -> Optional[str]:
+        """Download a file from Hatrac object store.
+
+        Args:
+            filename: Local filename to save as.
+            file_url: Hatrac URL of the file.
+            rid: RID of the image for error reporting.
+
+        Returns:
+            Path to the downloaded file, or None on error.
+        """
         try:
             hatracFile = '{}/{}'.format(self.data_scratch, filename)
             self.store.get_obj(file_url, destfilename=hatracFile)
@@ -567,25 +685,42 @@ class DerivaImagingWorker (object):
             os.remove(hatracFile)
             return None
 
-    """
-    Get the hatrac thumbnail URL
-    Namespace: /facebase/data/fb3/{dataset}/{replicate}/proc_img/{RID}/<filename>
-    """
-    def getThumbnailHatracURL(self, thumbnail_pattern, converted_file_name, rid):
+    def getThumbnailHatracURL(self, thumbnail_pattern: str, converted_file_name: str, rid: str) -> str:
+        """Generate the IIIF thumbnail URL for a Hatrac file.
+
+        Args:
+            thumbnail_pattern: URL pattern with %s placeholder for the URI.
+            converted_file_name: Name of the converted file.
+            rid: RID of the image.
+
+        Returns:
+            Complete IIIF thumbnail URL.
+        """
         hatrac_uri = '{}/{}/{}'.format(self.hatrac_prefix, urlquote(rid), urlquote(converted_file_name))
         return thumbnail_pattern % (urlquote(hatrac_uri))
     
-    """
-    Generate the thumbnail pattern
-    """
-    def getThumbnailPattern(self):
+    def getThumbnailPattern(self) -> str:
+        """Generate the IIIF thumbnail URL pattern.
+
+        Returns:
+            URL pattern string with %s placeholder for the Hatrac URI.
+        """
         thumbnail_pattern = '/iiif/2/%s/full/,100/0/default.jpg' 
         return thumbnail_pattern
             
-    """
-    Get the MD5 of the file after removing the UUID value
-    """
-    def getBaseMD5(self, file_name, file_path=None):
+    def getBaseMD5(self, file_name: str, file_path: Optional[str] = None) -> Optional[str]:
+        """Calculate MD5 hash of a file after removing UUID values.
+
+        This creates a stable hash for files that may have different UUIDs
+        but are otherwise identical.
+
+        Args:
+            file_name: Name of the file.
+            file_path: Directory containing the file. Defaults to images directory.
+
+        Returns:
+            Hex-encoded MD5 hash, or None on error.
+        """
         if file_path == None:
             file_path = '/var/www/html/{}'.format(self.images)
         md5 = None
@@ -626,12 +761,17 @@ class DerivaImagingWorker (object):
         
         return md5
             
-    """
-    Get the info related to a companion.ome file 
-    """
-    def getCompanionInfo(self, scene, z, companion):
-        """
-        Get the info related to a companion.ome file 
+    def getCompanionInfo(self, scene: Optional[int], z: Optional[int], companion: list[tuple[str, str, int, str]]) -> tuple[Optional[str], Optional[str], Optional[int], Optional[str]]:
+        """Get metadata for a companion OME file matching scene and Z index.
+
+        Args:
+            scene: Scene/series number, or None for any scene.
+            z: Z index, or None for any Z.
+            companion: List of (url, name, bytes, md5) tuples.
+
+        Returns:
+            Tuple of (url, name, bytes, md5) for matching companion file,
+            or (None, None, None, None) if not found.
         """
         for companion_ome in companion:
             url,name,bytes,md5 = companion_ome
@@ -658,10 +798,15 @@ class DerivaImagingWorker (object):
     
         return (None, None, None, None)
 
-    """
-    Set the image metadata into the pyramids tiff files
-    """
-    def set_image_properties(self, rid):
+    def set_image_properties(self, rid: str) -> None:
+        """Set image metadata into the pyramid TIFF files.
+
+        Calculates pixels per meter for each pyramid and counts total series,
+        Z indices, and channels.
+
+        Args:
+            rid: RID of the image for error reporting.
+        """
         series_no = 0
         z_index_no = 0
         channels_no = 0
@@ -707,12 +852,18 @@ class DerivaImagingWorker (object):
             image_properties['Channels'][channel_name] = channel_properties
             channel_number +=1
         
-    """
-    Populate the Image table with the scenes
-    """
-    def processTiffPyramids(self, parent_row, rid):
-        """
-        Get the series
+    def processTiffPyramids(self, parent_row: dict[str, Any], rid: str) -> int:
+        """Populate the Image table with scene data from pyramids.
+
+        Uploads TIFF files to Hatrac, creates Processed_Image records,
+        and updates Image table with thumbnails, URLs, and metadata.
+
+        Args:
+            parent_row: Parent image row from the catalog.
+            rid: RID of the parent image.
+
+        Returns:
+            0 on success, 1 on error.
         """
         series = []
         scenes = {}
@@ -1251,10 +1402,15 @@ class DerivaImagingWorker (object):
         
         return returncode
 
-    """
-    Check that the info.json can be accessed
-    """
-    def checkInfoJSON(self, rid):
+    def checkInfoJSON(self, rid: str) -> int:
+        """Verify that IIIF info.json endpoint is accessible for all images.
+
+        Args:
+            rid: RID of the image for error reporting.
+
+        Returns:
+            0 if all info.json endpoints return HTTP 200, 1 on error.
+        """
         for file_name in self.tiff_images:
             file_path = '/var/www/html/%s%s%s' % (self.images, os.sep, file_name)
             if os.path.isfile(file_path):
@@ -1285,10 +1441,15 @@ class DerivaImagingWorker (object):
 
         return 0
         
-    """
-    Check that the thumbnail can be accessed
-    """
-    def checkThumbnailURL(self, rid):
+    def checkThumbnailURL(self, rid: str) -> int:
+        """Verify that IIIF thumbnail endpoint is accessible for all images.
+
+        Args:
+            rid: RID of the image for error reporting.
+
+        Returns:
+            0 if all thumbnail endpoints return HTTP 200, 1 on error.
+        """
         for file_name in self.tiff_images:
             file_path = '/var/www/html/%s%s%s' % (self.images, os.sep, file_name)
             if os.path.isfile(file_path):
@@ -1319,10 +1480,19 @@ class DerivaImagingWorker (object):
 
         return 0
                 
-    """
-    Get the image resolution based on the formula "(int) (10**6 / float(physicalSizeX))"
-    """
-    def getResolution(self, metadata, rid):
+    def getResolution(self, metadata: etree._Element, rid: str) -> Optional[list[int]]:
+        """Extract image resolutions from OME-XML metadata.
+
+        Calculates pixels per meter from PhysicalSizeX using the formula:
+        resolution = 10^6 / PhysicalSizeX (when unit is micrometers).
+
+        Args:
+            metadata: Parsed OME-XML element tree.
+            rid: RID of the image for error reporting.
+
+        Returns:
+            List of unique resolutions in pixels per meter, or None on error.
+        """
         try:
             resolutions = []
             for image in metadata.iter(self.image_tag):
@@ -1359,10 +1529,20 @@ class DerivaImagingWorker (object):
             self.logger.error('%s' % ''.join(traceback.format_exception(et, ev, tb)))
             self.sendMail('FAILURE IMAGE PROCESSING: Can not get the resolution', 'RID: %s\n%s\n' % (rid, ''.join(traceback.format_exception(et, ev, tb))))
             return None
-    """
-    Get the image resolution based on the formula "(int) (10**6 / float(physicalSizeX))"
-    """
-    def getPixelsPerMeter(self, physicalSizeXUnit, physicalSizeX, rid):
+    def getPixelsPerMeter(self, physicalSizeXUnit: str, physicalSizeX: float, rid: str) -> Optional[int]:
+        """Calculate pixels per meter from physical size.
+
+        Uses the formula: pixels_per_meter = 10^6 / PhysicalSizeX
+        when the unit is micrometers.
+
+        Args:
+            physicalSizeXUnit: Unit string for physical size (e.g., 'µm').
+            physicalSizeX: Physical size value.
+            rid: RID of the image for error reporting.
+
+        Returns:
+            Pixels per meter as integer, or None if unit is not micrometers.
+        """
         try:
             pixels_per_meter = None
             if physicalSizeXUnit not in self.micrometer:
@@ -1378,10 +1558,19 @@ class DerivaImagingWorker (object):
             self.logger.error('%s' % ''.join(traceback.format_exception(et, ev, tb)))
             self.sendMail('FAILURE IMAGE PROCESSING: Can not get the resolution', 'RID: %s\n%s\n' % (rid, ''.join(traceback.format_exception(et, ev, tb))))
             return None
-    """
-    Convert the file to a tiled pyramid
-    """
-    def convert2pyramid(self, filename, rid):
+    def convert2pyramid(self, filename: str, rid: str) -> int:
+        """Convert an image file to tiled pyramid TIFF format.
+
+        Uses extract_scenes to convert the source image to multiple
+        pyramidal TIFFs organized by scene, Z index, and channel.
+
+        Args:
+            filename: Path to the source image file.
+            rid: RID of the image for error reporting.
+
+        Returns:
+            0 on success, 1 on error.
+        """
         try:
             currentDirectory=os.getcwd()
             os.chdir(self.data_scratch)
@@ -1551,12 +1740,18 @@ class DerivaImagingWorker (object):
             os.remove(filename)
             return 1
             
-    """
-    Update the ermrest attributes 
-    """
-    def updateAttributes (self, schema, table, rid, columns, row):
-        """
-        Update the ermrest attributes with the row values.
+    def updateAttributes(self, schema: str, table: str, rid: str, columns: list[str], row: dict[str, Any]) -> int:
+        """Update attributes in an ERMrest table.
+
+        Args:
+            schema: Schema name.
+            table: Table name.
+            rid: RID of the row to update.
+            columns: List of column names to update.
+            row: Dictionary containing column values (must include 'RID').
+
+        Returns:
+            0 on success, 1 on error.
         """
         try:
             columns = ','.join([urlquote(col) for col in columns])
@@ -1575,12 +1770,15 @@ class DerivaImagingWorker (object):
             self.sendMail('FAILURE IMAGE PROCESSING: STATE CHANGE ONCE ERROR', 'RID: %s\n%s\n' % (rid, ''.join(traceback.format_exception(et, ev, tb))))
             return 1
             
-    """
-    Delete the rows referencing the source image
-    """
-    def deleteEntity (self, path, rid):
-        """
-        Delete the rows from the table.
+    def deleteEntity(self, path: str, rid: str) -> int:
+        """Delete rows from an ERMrest table.
+
+        Args:
+            path: ERMrest path specifying the rows to delete.
+            rid: RID of the source image for error reporting.
+
+        Returns:
+            0 on success (including when no rows found), 1 on error.
         """
         try:
             url = '/entity/{}'.format(path)
@@ -1607,12 +1805,16 @@ class DerivaImagingWorker (object):
             self.sendMail('FAILURE IMAGE PROCESSING: DELETE ENTITY ERROR', 'RID: %s\n%s\n' % (rid, ''.join(traceback.format_exception(et, ev, tb))))
             return 1
 
-    """
-    Insert a row in a table
-    """
-    def createEntity (self, path, row, rid):
-        """
-        Insert the row in the table.
+    def createEntity(self, path: str, row: dict[str, Any], rid: str) -> Optional[str]:
+        """Insert a row into an ERMrest table.
+
+        Args:
+            path: ERMrest path for the table (schema:table).
+            row: Dictionary containing column values.
+            rid: RID of the source image for error reporting.
+
+        Returns:
+            URL path on success, None on error.
         """
         try:
             url = '/entity/{}'.format(path)
@@ -1631,12 +1833,16 @@ class DerivaImagingWorker (object):
             self.sendMail('FAILURE IMAGE PROCESSING: CREATE ENTITY ERROR', 'RID: %s\n%s\n' % (rid, ''.join(traceback.format_exception(et, ev, tb))))
             return None
 
-    """
-    Insert a row into a table specified by the url
-    """
-    def createRecord (self, url, row, rid):
-        """
-        Insert the row into the table referred by the url.
+    def createRecord(self, url: str, row: dict[str, Any], rid: str) -> Optional[str]:
+        """Insert a row into an ERMrest table and return the new RID.
+
+        Args:
+            url: Full ERMrest URL for the table.
+            row: Dictionary containing column values.
+            rid: RID of the source image for error reporting.
+
+        Returns:
+            RID of the newly created row, or None on error.
         """
         try:
             resp = self.catalog.post(
@@ -1655,10 +1861,11 @@ class DerivaImagingWorker (object):
             self.sendMail('FAILURE IMAGE PROCESSING: CREATE ENTITY ERROR', 'RID: %s\n%s\n' % (rid, ''.join(traceback.format_exception(et, ev, tb))))
             return None
 
-    """
-    Remove the files resulted from the conversion and metadata.
-    """
-    def removeConvertedFiles(self):
+    def removeConvertedFiles(self) -> None:
+        """Remove converted image files and metadata from output directories.
+
+        Cleans up the images and output_metadata directories under /var/www/html.
+        """
         for file_name in os.listdir('/var/www/html/%s' % (self.images)):
             file_path = '/var/www/html/%s%s%s' % (self.images, os.sep, file_name)
             if os.path.isfile(file_path):
@@ -1671,10 +1878,11 @@ class DerivaImagingWorker (object):
                 os.remove(file_path)
 
         
-    """
-    Cleanup the scratch directory.
-    """
-    def cleanupDataScratch(self):
+    def cleanupDataScratch(self) -> None:
+        """Clean up the data scratch directory.
+
+        Removes all files and directories from the scratch directory.
+        """
         for file_name in os.listdir(self.data_scratch):
             file_path = '{}/{}'.format(self.data_scratch, file_name)
             if os.path.isfile(file_path):
@@ -1684,10 +1892,20 @@ class DerivaImagingWorker (object):
                 self.logger.debug('Removing directory "{}"'.format(file_path))
                 shutil.rmtree(file_path)
         
-    """
-    Store the file into hatrac
-    """
-    def storeFileInHatrac(self, file_name, file_path, rid):
+    def storeFileInHatrac(self, file_name: str, file_path: str, rid: str) -> tuple[Optional[str], Optional[str], Optional[int], Optional[str]]:
+        """Upload a file to Hatrac object store.
+
+        Skips upload if the file already exists with matching content.
+
+        Args:
+            file_name: Name of the file to upload.
+            file_path: Directory containing the file.
+            rid: RID of the image for constructing Hatrac path.
+
+        Returns:
+            Tuple of (hatrac_uri, file_name, file_size, md5_hex) on success,
+            or (None, None, None, None) on error.
+        """
         try:
             newFile = '{}/{}'.format(file_path, file_name)
             file_size = os.path.getsize(newFile)

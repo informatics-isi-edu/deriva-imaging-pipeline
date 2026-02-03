@@ -1,11 +1,11 @@
 [Unit]
 Description=Deriva Imaging Pipeline Service
-ConditionPathExists=/home/ENTER_USERNAME/deriva_imaging
+ConditionPathExists=/home/ENTER_USERNAME/deriva-imaging-pipeline
 After=network.target
 
 [Service]
 Environment="DERIVA_IMAGING_POLL_SECONDS=300" "DERIVA_PIPELINE_HOSTNAME=ENTER_HOSTNAME"
-ExecStart=/usr/local/bin/deriva-imaging-server --config /home/ENTER_USERNAME/deriva_imaging/config/deriva_imaging_www.json
+ExecStart=/home/ENTER_USERNAME/deriva-imaging-pipeline/.venv/bin/deriva-imaging-server --config /home/ENTER_USERNAME/.deriva_imaging.json
 RestartSec=60
 Restart=always
 KillMode=mixed
