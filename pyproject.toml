@@ -11,7 +11,6 @@ authors = [
 classifiers = [
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3",
     "Topic :: Internet :: WWW/HTTP",
     "Topic :: Scientific/Engineering :: Image Processing",
@@ -38,5 +37,9 @@ deriva-imaging-client = "deriva_imaging_pipeline.client:main"
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools.packages.find]
+include = ["deriva_imaging_pipeline*"]
+exclude = ["config*", "service*"]
+
 [tool.uv]
-managed-python = true
+managed = true
