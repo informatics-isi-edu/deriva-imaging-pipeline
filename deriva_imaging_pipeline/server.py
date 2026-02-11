@@ -285,6 +285,10 @@ def main() -> int:
     logfile = config.get('log')
 
     if loglevel and logfile:
+        # Clear handlers and reset root logger BEFORE calling init_logging
+        root_logger = logging.getLogger()
+        root_logger.handlers.clear()
+        root_logger.setLevel(logging.NOTSET)
         init_logging(level=loglevel, log_format=FORMAT, file_path=logfile)
     else:
         logging.getLogger().addHandler(logging.NullHandler())
