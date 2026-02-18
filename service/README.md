@@ -8,6 +8,7 @@ location.
 To install in a standard system location:
 
 * Set `UV_PYTHON_INSTALL_DIR=/opt/uv-python` to instruct `uv` to install python under `/opt`
+* Run `uv python install 3.14` (or similar) to install a recent, supported version of python under `/opt`
 * Clone this repository under `/opt` and follow the usual installation instructions
 * For good measure, you may want to install `uv` itself in `/usr/local/bin` by setting `UV_INSTALL_DIR`
 
