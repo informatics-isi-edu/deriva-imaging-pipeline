@@ -69,6 +69,9 @@ sudo systemctl enable deriva-imaging-pipeline
 sudo systemctl start deriva-imaging-pipeline
 ```
 
+See [service/README.md](service/README.md) for important notes when running the service
+with SELinux enabled.
+
 ## License
 
 Apache 2.0
