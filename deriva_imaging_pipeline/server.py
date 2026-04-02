@@ -289,7 +289,7 @@ def main() -> int:
         root_logger = logging.getLogger()
         root_logger.handlers.clear()
         root_logger.setLevel(logging.NOTSET)
-        init_logging(level=loglevel, log_format=FORMAT, file_path=logfile)
+        init_logging(level=loglevel, log_format=FORMAT, file_path=logfile, file_mode='a')
     else:
         logging.getLogger().addHandler(logging.NullHandler())
 

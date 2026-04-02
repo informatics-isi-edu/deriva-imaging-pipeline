@@ -87,6 +87,8 @@ def load(config_filename: str) -> Optional[dict[str, Any]]:
             cfg: dict[str, Any] = json.load(f)
 
         loglevel = cfg.get('loglevel')
+        if loglevel:
+            loglevel = _LOGLEVEL.get(loglevel)
         logfile = cfg.get('log')
 
         if loglevel and logfile:
@@ -94,7 +96,7 @@ def load(config_filename: str) -> Optional[dict[str, Any]]:
             root_logger = logging.getLogger()
             root_logger.handlers.clear()
             root_logger.setLevel(logging.NOTSET)
-            init_logging(level=_LOGLEVEL.get(loglevel), log_format=FORMAT, file_path=logfile)
+            init_logging(level=loglevel, log_format=FORMAT, file_path=logfile, file_mode='a')
         else:
             logging.getLogger().addHandler(logging.NullHandler())
 
