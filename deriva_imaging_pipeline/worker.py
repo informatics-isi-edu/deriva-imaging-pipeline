@@ -131,6 +131,7 @@ class DerivaImagingWorker:
         """
         self.missing_scenes = False
         self.z_threshold = os.getenv('z_threshold', 5)
+        self.generate_ome_companion = kwargs.get('generate_ome_companion', False)
         self.model = kwargs.get('model')
         self.hatrac_template = kwargs.get('hatrac_template')
         self.iiif_url = kwargs.get('iiif_url')
@@ -906,21 +907,22 @@ class DerivaImagingWorker:
         if (Metadata_URL, Metadata_Name, Metadata_Bytes, Metadata_MD5) == (None, None, None, None):
             return 1
         companion = []
-        for companion_ome in self.ome_xml:
-            try:
-                r = re.search('.*[-]s[0-9]+[-]z([0-9]+)[.]companion[.]ome', companion_ome).group(1)
-                if z_index_no <= self.z_threshold and int(r) == middle_z_index or z_index_no > self.z_threshold:
+        if self.generate_ome_companion:
+            for companion_ome in self.ome_xml:
+                try:
+                    r = re.search('.*[-]s[0-9]+[-]z([0-9]+)[.]companion[.]ome', companion_ome).group(1)
+                    if z_index_no <= self.z_threshold and int(r) == middle_z_index or z_index_no > self.z_threshold:
+                        companion_file = self.storeFileInHatrac(companion_ome, '/var/www/html/{}'.format(self.output_metadata), rid)
+                        if companion_file == (None, None, None, None):
+                            return 1
+                        else:
+                            companion.append(companion_file)
+                except:
                     companion_file = self.storeFileInHatrac(companion_ome, '/var/www/html/{}'.format(self.output_metadata), rid)
                     if companion_file == (None, None, None, None):
                         return 1
                     else:
                         companion.append(companion_file)
-            except:
-                companion_file = self.storeFileInHatrac(companion_ome, '/var/www/html/{}'.format(self.output_metadata), rid)
-                if companion_file == (None, None, None, None):
-                    return 1
-                else:
-                    companion.append(companion_file)
 
         """
         Get the scenes
@@ -1272,9 +1274,12 @@ class DerivaImagingWorker:
                 
         """
         Build now the Image_Z record
+
+        Only when companion generation is enabled: Image_Z rows require non-null
+        OME_Companion_* columns, so without companions there is nothing to record.
         """
-        for pyramid in self.tiff_files:
-            if channels_no > 1:
+        if self.generate_ome_companion and channels_no > 1:
+            for pyramid in self.tiff_files:
                 if z_index_no <= self.z_threshold and pyramid['z'] != middle_z_index:
                     continue
                 
@@ -1577,7 +1582,7 @@ class DerivaImagingWorker:
             os.chdir(self.data_scratch)
             self.logger.debug('Executing: extract_scenes.run({}, {})'.format(filename, 'processing_dir='.format(self.processing_dir)))
             try:
-                extract_scenes.run(filename, processing_dir=self.processing_dir)
+                extract_scenes.run(filename, processing_dir=self.processing_dir, generate_companion=self.generate_ome_companion)
                 os.chdir(currentDirectory)
             except:
                 os.chdir(currentDirectory)
@@ -1647,12 +1652,13 @@ class DerivaImagingWorker:
                 if series_details[0][self.physicalSizeXUnit] in self.micrometer:
                     self.resolutions = [(int) (10**6 / float(series_details[0][self.physicalSizeX]))]
                     
+            if self.generate_ome_companion:
+                for entry in os.scandir('{}/{}'.format(self.data_scratch, fname)):
+                    if entry.is_file() and entry.path.endswith('.companion.ome'):
+                        self.ome_xml.append(entry.name)
+
             for entry in os.scandir('{}/{}'.format(self.data_scratch, fname)):
-                if entry.is_file() and entry.path.endswith('.companion.ome'):
-                    self.ome_xml.append(entry.name)
-            
-            for entry in os.scandir('{}/{}'.format(self.data_scratch, fname)):
-                if entry.is_file() and (entry.path.endswith('.json') or entry.path.endswith('.companion.ome')):
+                if entry.is_file() and (entry.path.endswith('.json') or (self.generate_ome_companion and entry.path.endswith('.companion.ome'))):
                     shutil.copy(entry.path, '/var/www/html/{}'.format(self.output_metadata))
             
             for entry in os.scandir('{}/{}'.format(self.data_scratch, fname)):

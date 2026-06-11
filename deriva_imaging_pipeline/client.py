@@ -254,6 +254,9 @@ def get_configuration(cfg: dict[str, Any], log: logging.Logger) -> Optional[dict
     # Optional with default: version
     config['version'] = cfg.get('version', 'v1.0')
 
+    # Optional with default: generate_ome_companion (off by default)
+    config['generate_ome_companion'] = cfg.get('generate_ome_companion', False)
+
     # Optional: mail settings
     config['mail_server'] = cfg.get('mail_server')
     config['mail_sender'] = cfg.get('mail_sender')
