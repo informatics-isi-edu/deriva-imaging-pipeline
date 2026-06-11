@@ -240,13 +240,17 @@ class DerivaImagingWorker:
                     ready = True
         elif self.mail_file != None:
             """
-            Put the mail message into the mail.log file
+            Put the mail message into the mail.log file.
+
+            Written as a single append (one write) to reduce interleaving when
+            multiple services share this file. The body starts with the current
+            UTC time so messages can be ordered/disambiguated.
             """
+            timestamp = time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())
             fw = open(self.mail_file, 'a')
-            fw.write('Subject: {}\n'.format(subject))
-            fw.write('Body:\n{}\n\n'.format(text))
+            fw.write('Subject: {}\nBody:\n{}\n{}\n\n'.format(subject, timestamp, text))
             fw.close()
-            
+
             return
             """
             Send the mail with the Linux mail utility
