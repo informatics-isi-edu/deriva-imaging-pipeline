@@ -58,6 +58,7 @@ import traceback
 import xml.etree.ElementTree as ET
 from email.mime.text import MIMEText
 from http import HTTPStatus
+from pathlib import Path
 from typing import Any, Optional
 from urllib.parse import urlparse
 
@@ -268,7 +269,7 @@ class DerivaImagingWorker:
             fw = open(scriptName, 'w')
             fw.write('{}\n'.format(command))
             fw.close()
-            os.chmod('{}'.format(scriptName), stat.S_IRWXU | stat.S_IRWXG | stat.S_IROTH | stat.S_IXOTH)
+            Path(scriptName).chmod(stat.S_IRWXU | stat.S_IRWXG | stat.S_IROTH | stat.S_IXOTH)
             
             self.logger.debug('Mail command: {}'.format(command))
             args = [bash_cmd, scriptName]
@@ -280,8 +281,8 @@ class DerivaImagingWorker:
             if returncode != 0:
                 self.logger.error('Can not send email.\nError Code:%d\nstdoutdata: %s\nstderrdata: %s\n' % (returncode, stdoutdata.decode('utf-8'), stderrdata.decode('utf-8'))) 
         
-            os.remove(scriptName)
-            os.remove(bodyName)
+            Path(scriptName).unlink()
+            Path(bodyName).unlink()
 
     def getMeterScaleInPixels(self, filename: str, rid: str) -> float:
         """Get the resolution of an image in pixels per meter.
@@ -681,14 +682,14 @@ class DerivaImagingWorker:
         try:
             hatracFile = '{}/{}'.format(self.data_scratch, filename)
             self.store.get_obj(file_url, destfilename=hatracFile)
-            self.logger.debug('File "%s", %d bytes.' % (hatracFile, os.stat(hatracFile).st_size)) 
+            self.logger.debug('File "%s", %d bytes.' % (hatracFile, Path(hatracFile).stat().st_size)) 
             return hatracFile
         except:
             et, ev, tb = sys.exc_info()
             self.logger.error('got unexpected exception "%s"' % str(ev))
             self.logger.error('{}'.format(''.join(traceback.format_exception(et, ev, tb))))
-            self.sendMail('FAILURE IMAGE PROCESSING: HATRAC GET ERROR', 'RID: {}\n{}\n'.format((rid, ''.join(traceback.format_exception(et, ev, tb)))))
-            os.remove(hatracFile)
+            self.sendMail('FAILURE IMAGE PROCESSING: HATRAC GET ERROR', 'RID: {}\n{}\n'.format(rid, ''.join(traceback.format_exception(et, ev, tb))))
+            Path(hatracFile).unlink(missing_ok=True)
             return None
 
     def getThumbnailHatracURL(self, thumbnail_pattern: str, converted_file_name: str, rid: str) -> str:
@@ -763,7 +764,7 @@ class DerivaImagingWorker:
             fw.close()  
              
         self.logger.debug('Removing file "%s"' % (outfile))
-        os.remove(outfile)
+        Path(outfile).unlink()
         
         return md5
             
@@ -1115,7 +1116,7 @@ class DerivaImagingWorker:
                 continue
             file_name = pyramid['name']
             newFile = '/var/www/html/%s/%s' % (self.images, file_name)
-            file_size = os.path.getsize(newFile)
+            file_size = Path(newFile).stat().st_size
             hashes = hu.compute_file_hashes(newFile, hashes=['md5', 'sha256'])
             new_md5 = hashes['md5'][1]
             new_sha256 = hashes['sha256'][1]
@@ -1162,7 +1163,7 @@ class DerivaImagingWorker:
                     return 1
                 
             self.logger.debug('Removing file "%s"' % (outfile))
-            os.remove(outfile)
+            Path(outfile).unlink(missing_ok=True)
                 
             pyramid['Download_Tiff_URL'] = hatrac_URI
             pyramid['Download_Tiff_Name'] = pyramid['name']
@@ -1329,7 +1330,7 @@ class DerivaImagingWorker:
         if ome_tif_file_name != None and store_ome == True:
             file_name = ome_tif_file_name
             newFile = '/var/www/html/%s/%s' % (self.images, file_name)
-            file_size = os.path.getsize(newFile)
+            file_size = Path(newFile).stat().st_size
             hashes = hu.compute_file_hashes(newFile, hashes=['md5', 'sha256'])
             new_md5 = hashes['md5'][1]
             new_sha256 = hashes['sha256'][1]
@@ -1374,11 +1375,11 @@ class DerivaImagingWorker:
                     return 1
 
             self.logger.debug('Removing file "%s"' % (outfile))
-            os.remove(outfile)
+            Path(outfile).unlink(missing_ok=True)
 
             download_tiff_url = hatrac_URI       
             download_tiff_file_name = ome_tif_file_name
-            download_tiff_file_bytes = os.path.getsize(newFile)
+            download_tiff_file_bytes = Path(newFile).stat().st_size
             download_tiff_file_md5 = base_md5
         OME_XML_URL, OME_XML_Name, OME_XML_Bytes, OME_XML_MD5 = self.getCompanionInfo(None, None, companion)
         returncode = self.updateAttributes(self.model['image_schema'],
@@ -1423,7 +1424,7 @@ class DerivaImagingWorker:
         """
         for file_name in self.tiff_images:
             file_path = '/var/www/html/%s%s%s' % (self.images, os.sep, file_name)
-            if os.path.isfile(file_path):
+            if Path(file_path).is_file():
                 args = [self.curl, '-s', '-k', '-w', '%{http_code}', '-o', '/dev/null', '{}/{}/info.json'.format(self.iiif_url, urlquote('https://{}/{}/{}'.format(self.host_server, self.images, urlquote(file_name))))]
                 try:
                     self.logger.debug('Executing:\n%s' % (' '.join(args)))
@@ -1462,7 +1463,7 @@ class DerivaImagingWorker:
         """
         for file_name in self.tiff_images:
             file_path = '/var/www/html/%s%s%s' % (self.images, os.sep, file_name)
-            if os.path.isfile(file_path):
+            if Path(file_path).is_file():
                 args = [self.curl, '-s', '-k', '-w', '%{http_code}', '-o', '/dev/null', '{}/{}/full/,100/0/default.jpg'.format(self.iiif_url, urlquote('https://{}/{}/{}'.format(self.host_server, self.images, urlquote(file_name))))]
                 try:
                     self.logger.debug('Executing:\n%s' % (' '.join(args)))
@@ -1596,11 +1597,11 @@ class DerivaImagingWorker:
                 self.logger.error('got convert exception "{}"'.format(ev))
                 self.logger.error('{}'.format(''.join(traceback.format_exception(et, ev, tb))))
                 self.sendMail('FAILURE IMAGE PROCESSING: Extract Scenes failed', 'RID: {}\nCan not extract_scenes for file {}.\n{}\n{}'.format(rid, filename, ev, ''.join(traceback.format_exception(et, ev, tb))))
-                os.remove(filename)
+                Path(filename).unlink()
                 return 1
 
-            image_file = os.path.basename(filename)
-            fname, ext = os.path.splitext(image_file)
+            image_file = Path(filename).name
+            fname, ext = Path(image_file).stem, Path(image_file).suffix
             
             for entry in os.scandir('{}/{}'.format(self.data_scratch, fname)):
                 if entry.is_dir() and entry.path.endswith('.zarr'):
@@ -1637,18 +1638,18 @@ class DerivaImagingWorker:
             prefix = fname
             
             for file_name in os.listdir(scenes_dir):
-                if os.path.isfile('{}/{}'.format(scenes_dir, file_name)):
+                if Path(scenes_dir, file_name).is_file():
                     try:
                         r = re.search('{}[-]s([0-9]+)[-]z.*'.format(prefix), file_name).group(1)
                         if int(r) in thumbnail_series:
-                            os.remove('{}/{}'.format(scenes_dir, file_name))
+                            Path(scenes_dir, file_name).unlink()
                     except:
                         pass
             
                     try:
                         r = re.search('{}[-]s([0-9]+)[.]companion[.]ome'.format(prefix), file_name).group(1)
                         if int(r) in thumbnail_series:
-                            os.remove('{}/{}'.format(scenes_dir, file_name))
+                            Path(scenes_dir, file_name).unlink()
                     except:
                         pass
             
@@ -1715,14 +1716,14 @@ class DerivaImagingWorker:
                         shutil.copy(entry.path, '/var/www/html/{}'.format(self.images))
 
             shutil.rmtree('{}/{}'.format(self.data_scratch, fname))
-            os.remove(filename)
+            Path(filename).unlink()
             
             """
             Remove the hidden files
             """
             for file_name in os.listdir(self.data_scratch):
-                if os.path.isfile('{}/{}'.format(self.data_scratch, file_name)) and file_name.startswith('.'):
-                    os.remove('{}/{}'.format(self.data_scratch, file_name))
+                if Path(self.data_scratch, file_name).is_file() and file_name.startswith('.'):
+                    Path(self.data_scratch, file_name).unlink()
             
             """
             Adjust the series level
@@ -1744,11 +1745,8 @@ class DerivaImagingWorker:
             self.logger.error('got unexpected exception "%s"' % str(ev))
             self.logger.error('%s' % ''.join(traceback.format_exception(et, ev, tb)))
             self.sendMail('FAILURE IMAGE PROCESSING: CONVERT TO PYRAMID ERROR', 'RID: %s\n%s\n' % (rid, ''.join(traceback.format_exception(et, ev, tb))))
-            try:
-                os.remove('{}/.{}.bfmemo'.format(os.path.dirname(filename), os.path.basename(filename)))
-            except FileNotFoundError:
-                pass
-            os.remove(filename)
+            (Path(filename).parent / '.{}.bfmemo'.format(Path(filename).name)).unlink(missing_ok=True)
+            Path(filename).unlink()
             return 1
             
     def updateAttributes(self, schema: str, table: str, rid: str, columns: list[str], row: dict[str, Any]) -> int:
@@ -1879,14 +1877,14 @@ class DerivaImagingWorker:
         """
         for file_name in os.listdir('/var/www/html/%s' % (self.images)):
             file_path = '/var/www/html/%s%s%s' % (self.images, os.sep, file_name)
-            if os.path.isfile(file_path):
+            if Path(file_path).is_file():
                 self.logger.debug('Removing file "%s"' % (file_path))
-                os.remove(file_path)
+                Path(file_path).unlink()
         for file_name in os.listdir('/var/www/html/%s' % (self.output_metadata)):
             file_path = '/var/www/html/%s%s%s' % (self.output_metadata, os.sep, file_name)
-            if os.path.isfile(file_path):
+            if Path(file_path).is_file():
                 self.logger.debug('Removing file "%s"' % (file_path))
-                os.remove(file_path)
+                Path(file_path).unlink()
 
         
     def cleanupDataScratch(self) -> None:
@@ -1896,10 +1894,10 @@ class DerivaImagingWorker:
         """
         for file_name in os.listdir(self.data_scratch):
             file_path = '{}/{}'.format(self.data_scratch, file_name)
-            if os.path.isfile(file_path):
+            if Path(file_path).is_file():
                 self.logger.debug('Removing file "{}"'.format(file_path))
-                os.remove(file_path)
-            elif os.path.isdir(file_path):
+                Path(file_path).unlink()
+            elif Path(file_path).is_dir():
                 self.logger.debug('Removing directory "{}"'.format(file_path))
                 shutil.rmtree(file_path)
         
@@ -1919,7 +1917,7 @@ class DerivaImagingWorker:
         """
         try:
             newFile = '{}/{}'.format(file_path, file_name)
-            file_size = os.path.getsize(newFile)
+            file_size = Path(newFile).stat().st_size
             hashes = hu.compute_file_hashes(newFile, hashes=['md5', 'sha256'])
             new_md5 = hashes['md5'][1]
             new_sha256 = hashes['sha256'][1]
@@ -1938,7 +1936,7 @@ class DerivaImagingWorker:
                 r = self.store.get_obj(new_uri, destfilename=outfile)
                 hatrac_URI = r.headers['Content-Location']
                 hatrac_base_md5 = self.getBaseMD5('{}.hatrac'.format(file_name))
-                os.remove(outfile)
+                Path(outfile).unlink(missing_ok=True)
             except:
                 hatrac_base_md5 = None
                 pass
