@@ -37,9 +37,9 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-import os
 import sys
 import traceback
+from pathlib import Path
 from typing import Any, Optional
 
 from deriva.core import init_logging
@@ -78,7 +78,7 @@ def load(config_filename: str) -> Optional[dict[str, Any]]:
         >>> if cfg:
         ...     print(cfg['baseuri'])
     """
-    if not os.path.exists(config_filename):
+    if not Path(config_filename).exists():
         sys.stderr.write(f'Configuration file: "{config_filename}" does not exist.\n')
         return None
 
@@ -155,7 +155,7 @@ def get_configuration(cfg: dict[str, Any], log: logging.Logger) -> Optional[dict
 
     # Required: credentials_file
     credfile = cfg.get('credentials_file')
-    if not credfile or not os.path.isfile(credfile):
+    if not credfile or not Path(credfile).is_file():
         log.error('The "credentials_file" must be provided in the configuration file and exist.')
         return None
 
@@ -184,35 +184,35 @@ def get_configuration(cfg: dict[str, Any], log: logging.Logger) -> Optional[dict
 
     # Required: data_scratch
     data_scratch = cfg.get('data_scratch')
-    if not data_scratch or not os.path.isdir(data_scratch):
+    if not data_scratch or not Path(data_scratch).is_dir():
         log.error('The "data_scratch" directory must be provided in the configuration file and exist.')
         return None
     config['data_scratch'] = data_scratch
 
     # Required: curl
     curl = cfg.get('curl')
-    if not curl or not os.path.isfile(curl):
+    if not curl or not Path(curl).is_file():
         log.error('The "curl" application must be provided in the configuration file and exist.')
         return None
     config['curl'] = curl
 
     # Required: wget
     wget = cfg.get('wget')
-    if not wget or not os.path.isfile(wget):
+    if not wget or not Path(wget).is_file():
         log.error('The "wget" application must be provided in the configuration file and exist.')
         return None
     config['wget'] = wget
 
     # Required: images directory
     images = cfg.get('images')
-    if not images or not os.path.isdir(f'/var/www/html/{images}'):
+    if not images or not Path(f'/var/www/html/{images}').is_dir():
         log.error('The "images" directory must be provided in the configuration file and exist.')
         return None
     config['images'] = images
 
     # Required: output_metadata directory
     output_metadata = cfg.get('output_metadata')
-    if not output_metadata or not os.path.isdir(f'/var/www/html/{output_metadata}'):
+    if not output_metadata or not Path(f'/var/www/html/{output_metadata}').is_dir():
         log.error('The "output_metadata" directory must be provided in the configuration file and exist.')
         return None
     config['output_metadata'] = output_metadata
@@ -222,7 +222,7 @@ def get_configuration(cfg: dict[str, Any], log: logging.Logger) -> Optional[dict
 
     # Required: model_file
     model_file = cfg.get('model_file')
-    if not model_file or not os.path.isfile(model_file):
+    if not model_file or not Path(model_file).is_file():
         log.error('The "model_file" must be provided in the configuration file and exist.')
         return None
 
@@ -232,14 +232,14 @@ def get_configuration(cfg: dict[str, Any], log: logging.Logger) -> Optional[dict
 
     # Required: python
     python_app = cfg.get('python')
-    if not python_app or not os.path.isfile(python_app):
+    if not python_app or not Path(python_app).is_file():
         log.error('The "python" application must be provided in the configuration file and exist.')
         return None
     config['python_app'] = python_app
 
     # Required: tiffinfo
     tiffinfo = cfg.get('tiffinfo')
-    if not tiffinfo or not os.path.isfile(tiffinfo):
+    if not tiffinfo or not Path(tiffinfo).is_file():
         log.error('The "tiffinfo" application must be provided in the configuration file and exist.')
         return None
     config['tiffinfo'] = tiffinfo
