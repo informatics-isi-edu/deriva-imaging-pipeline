@@ -1597,7 +1597,7 @@ class DerivaImagingWorker:
                 self.logger.error('got convert exception "{}"'.format(ev))
                 self.logger.error('{}'.format(''.join(traceback.format_exception(et, ev, tb))))
                 self.sendMail('FAILURE IMAGE PROCESSING: Extract Scenes failed', 'RID: {}\nCan not extract_scenes for file {}.\n{}\n{}'.format(rid, filename, ev, ''.join(traceback.format_exception(et, ev, tb))))
-                Path(filename).unlink()
+                Path(filename).unlink(missing_ok=True)
                 return 1
 
             image_file = Path(filename).name
@@ -1746,7 +1746,7 @@ class DerivaImagingWorker:
             self.logger.error('%s' % ''.join(traceback.format_exception(et, ev, tb)))
             self.sendMail('FAILURE IMAGE PROCESSING: CONVERT TO PYRAMID ERROR', 'RID: %s\n%s\n' % (rid, ''.join(traceback.format_exception(et, ev, tb))))
             (Path(filename).parent / '.{}.bfmemo'.format(Path(filename).name)).unlink(missing_ok=True)
-            Path(filename).unlink()
+            Path(filename).unlink(missing_ok=True)
             return 1
             
     def updateAttributes(self, schema: str, table: str, rid: str, columns: list[str], row: dict[str, Any]) -> int:
