@@ -377,7 +377,11 @@ class DerivaImagingWorker:
         row['Series'] = scene
         row['Original_File_Name'] = '{} (image {})'.format(parent_original_file_name, scene)
         row['Generated_Zs'] = 1 if z_index_no <= self.z_threshold else z_index_no
-        row['Properties'] = self.tiff_files[scene]['series_properties']
+        # Look up by series number, not list position (middle scenes might be dropped if marked as thumbnail)
+        pyramid = next((tf for tf in self.tiff_files if tf['series'] == scene), None)
+        if pyramid == None:
+            raise ValueError('No pyramid found for series {} of RID {}'.format(scene, rid))
+        row['Properties'] = pyramid['series_properties']
         return row
         
     def getImageRow(self, primary_row: dict[str, Any], rid: str) -> dict[str, Any]:
@@ -1974,5 +1978,3 @@ class DerivaImagingWorker:
             self.logger.error('%s' % ''.join(traceback.format_exception(et, ev, tb)))
             self.sendMail('FAILURE IMAGE PROCESSING: HATRAC STORE ERROR', 'RID: %s\n%s\n' % (rid, ''.join(traceback.format_exception(et, ev, tb))))
             return (None, None, None, None)
-        
-
