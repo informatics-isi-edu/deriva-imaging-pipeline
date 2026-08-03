@@ -943,17 +943,18 @@ class DerivaImagingWorker:
         resp = self.catalog.get(url)
         resp.raise_for_status()
         rows = resp.json()
-        update_scenes = (len(rows) > 0)
-        if update_scenes == True:
-            self.logger.debug('Image Scenes to be updated: {}'.format(json.dumps(rows, indent = 4)))
-        
-        scene_rows = rows
+        # A parent is never its own scene, and Image.Parent_Image is ON DELETE CASCADE.
+        scene_rows = [r for r in rows if r['RID'] != parent_row['RID']]
+        if len(scene_rows) > 0:
+            self.logger.debug('Image Scenes to be updated: {}'.format(json.dumps(scene_rows, indent = 4)))
+        existing_scenes = {r['Series']: r['RID'] for r in scene_rows if r['Series'] != None}
 
         """
         Delete the references from Processed_Image for the scenes
         """
-        scene_rows.append({'RID': parent_row['RID'], 'Series': None})
-        for scene_row in scene_rows:
+        # The parent holds these rows itself when there is a single series.
+        delete_targets = scene_rows + [{'RID': parent_row['RID'], 'Series': None}]
+        for scene_row in delete_targets:
             image_rid = scene_row['RID']
             """
             /attribute/{image_schema}:{processed_image}/Reference_Image={image_rid}/RID
@@ -973,7 +974,7 @@ class DerivaImagingWorker:
         """
         Delete the references from Image_Channel
         """
-        for scene_row in scene_rows:
+        for scene_row in delete_targets:
             image_rid = scene_row['RID']
             """
             /attribute/{image_schema}:{image_channel}/Image={image_rid}/RID
@@ -993,7 +994,7 @@ class DerivaImagingWorker:
         """
         Delete the references from Image_Z
         """
-        for scene_row in scene_rows:
+        for scene_row in delete_targets:
             image_rid = scene_row['RID']
             """
             /attribute/{image_schema}:{image_z}/Image={image_rid}/RID
@@ -1091,16 +1092,18 @@ class DerivaImagingWorker:
                 Copy the columns from the parent table
                 """
                 row = self.getSceneRow(parent_row, serie, middle_z_index, z_index_no, parent_row['RID'])
-                if update_scenes == False:
+                scene_rid = existing_scenes.get(serie)
+                if scene_rid == None:
                     """
                     POST url: /entity/{image_schema}:{image_table}
                     """
+                    self.logger.debug('Creating scene for series {} of RID {}.'.format(serie, rid))
                     scene_rid = self.createRecord('/entity/{}:{}'.format(urlquote(self.model['image_schema']), urlquote(self.model['image_table'])), row, rid)
                     if scene_rid == None:
                         return 1
                     scenes[str(serie)] = scene_rid
                 else:
-                    scene_rid = scene_rows[serie]['RID']
+                    self.logger.debug('Updating scene {} for series {} of RID {}.'.format(scene_rid, serie, rid))
                     cols = list(row.keys())
                     row['RID'] = scene_rid
                     returncode = self.updateAttributes(self.model['image_schema'],
@@ -1111,7 +1114,22 @@ class DerivaImagingWorker:
                     if returncode != 0:
                         return 1
                     scenes[str(serie)] = scene_rid
-            
+
+        """
+        Delete the scenes that are no longer generated for this image
+        """
+        used_scenes = set(scenes.values())
+        for scene_row in scene_rows:
+            scene_rid = scene_row['RID']
+            if scene_rid in used_scenes or scene_rid == parent_row['RID']:
+                continue
+            self.logger.info('Deleting the scene "%s" of the image "%s" as it is no longer generated.' % (scene_rid, rid))
+            """
+            /entity/{image_schema}:{image_table}/RID={scene_rid}&Parent_Image={parent_rid}
+            """
+            if self.deleteEntity('{}:{}/RID={}&Parent_Image={}'.format(urlquote(self.model['image_schema']), urlquote(self.model['image_table']), urlquote(scene_rid), urlquote(parent_row['RID'])), rid) != 0:
+                self.logger.error('Can not delete the scene "%s" of the image "%s".' % (scene_rid, rid))
+
         """
         Store the tiff files into the Processed_Image table
         """
