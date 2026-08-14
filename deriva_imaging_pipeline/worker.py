@@ -822,11 +822,13 @@ class DerivaImagingWorker:
         z_index_no = 0
         channels_no = 0
         for pyramid in self.tiff_files:
-            try:
-                pyramid['Pixels_Per_Meter'] = self.getPixelsPerMeter(pyramid['series_details']['PhysicalSizeXUnit'], pyramid['series_details']['PhysicalSizeX'], rid)
-            except:
+            # PhysicalSize is optional in OME-XML (absent e.g. for sources without resolution metadata)
+            sd = pyramid['series_details']
+            if 'PhysicalSizeXUnit' in sd and 'PhysicalSizeX' in sd:
+                pyramid['Pixels_Per_Meter'] = self.getPixelsPerMeter(sd['PhysicalSizeXUnit'], sd['PhysicalSizeX'], rid)
+            else:
                 pyramid['Pixels_Per_Meter'] = None
-                
+
             if pyramid['series_details']['Thumbnail series'] == True:
                 continue
             if pyramid['z'] > z_index_no:
@@ -883,14 +885,13 @@ class DerivaImagingWorker:
         z_index_no = 0
         channels_no = 0
         for pyramid in self.tiff_files:
-            try:
-                pyramid['Pixels_Per_Meter'] = self.getPixelsPerMeter(pyramid['series_details']['PhysicalSizeXUnit'], pyramid['series_details']['PhysicalSizeX'], rid)
-            except:
+            # PhysicalSize is optional in OME-XML (absent e.g. for sources without resolution metadata)
+            sd = pyramid['series_details']
+            if 'PhysicalSizeXUnit' in sd and 'PhysicalSizeX' in sd:
+                pyramid['Pixels_Per_Meter'] = self.getPixelsPerMeter(sd['PhysicalSizeXUnit'], sd['PhysicalSizeX'], rid)
+            else:
                 pyramid['Pixels_Per_Meter'] = None
-                self.logger.info('No Pixels_Per_Meter found for file {}.'.format(pyramid['name']))
-                et, ev, tb = sys.exc_info()
-                self.logger.error('%s' % ''.join(traceback.format_exception(et, ev, tb)))
-                
+
             if pyramid['series_details']['Thumbnail series'] == True:
                 continue
             if pyramid['z'] > max_z_index:
