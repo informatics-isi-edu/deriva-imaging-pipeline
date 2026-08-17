@@ -824,10 +824,9 @@ class DerivaImagingWorker:
         for pyramid in self.tiff_files:
             # PhysicalSize is optional in OME-XML (absent e.g. for sources without resolution metadata)
             sd = pyramid['series_details']
-            if 'PhysicalSizeXUnit' in sd and 'PhysicalSizeX' in sd:
-                pyramid['Pixels_Per_Meter'] = self.getPixelsPerMeter(sd['PhysicalSizeXUnit'], sd['PhysicalSizeX'], rid)
-            else:
-                pyramid['Pixels_Per_Meter'] = None
+            psx_unit = sd.get('PhysicalSizeXUnit')
+            psx = sd.get('PhysicalSizeX')
+            pyramid['Pixels_Per_Meter'] = self.getPixelsPerMeter(psx_unit, psx, rid) if psx_unit and psx else None
 
             if pyramid['series_details']['Thumbnail series'] == True:
                 continue
@@ -887,10 +886,9 @@ class DerivaImagingWorker:
         for pyramid in self.tiff_files:
             # PhysicalSize is optional in OME-XML (absent e.g. for sources without resolution metadata)
             sd = pyramid['series_details']
-            if 'PhysicalSizeXUnit' in sd and 'PhysicalSizeX' in sd:
-                pyramid['Pixels_Per_Meter'] = self.getPixelsPerMeter(sd['PhysicalSizeXUnit'], sd['PhysicalSizeX'], rid)
-            else:
-                pyramid['Pixels_Per_Meter'] = None
+            psx_unit = sd.get('PhysicalSizeXUnit')
+            psx = sd.get('PhysicalSizeX')
+            pyramid['Pixels_Per_Meter'] = self.getPixelsPerMeter(psx_unit, psx, rid) if psx_unit and psx else None
 
             if pyramid['series_details']['Thumbnail series'] == True:
                 continue
