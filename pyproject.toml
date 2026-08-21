@@ -17,6 +17,7 @@ classifiers = [
 ]
 dependencies = [
     "deriva",
+    "deriva-extras @ git+https://github.com/informatics-isi-edu/deriva-extras.git",
     "lxml",
     "python-dateutil",
     "requests",

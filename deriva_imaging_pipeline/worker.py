@@ -64,6 +64,7 @@ from urllib.parse import urlparse
 
 from dateutil.parser import parse
 from deriva.core import HatracStore, PollingErmrestCatalog, urlquote
+from deriva.utils.extras.data import insert_table_rows
 from deriva.core.utils import hash_utils as hu
 from deriva.core.utils.core_utils import DEFAULT_CHUNK_SIZE
 from lxml import etree
@@ -1285,6 +1286,7 @@ class DerivaImagingWorker:
         """
         Build now the channels
         """
+        channel_rows = []
         for pyramid in self.tiff_files:
             if pyramid['z'] == middle_z_index:
                 row = {'Image': scenes[str(pyramid['series'])],
@@ -1294,9 +1296,9 @@ class DerivaImagingWorker:
                        'Name': pyramid['channel_name'],
                        'Notes': None
                        }
-                image_channel_rid = self.createRecord('/entity/{}:{}'.format(urlquote(self.model['image_schema']), urlquote(self.model['image_channel'])), row, rid)
-                if image_channel_rid == None:
-                    return 1
+                channel_rows.append(row)
+        if channel_rows and self.createEntities(self.model['image_channel'], channel_rows, rid) == None:
+            return 1
                 
         """
         Build now the Image_Z record
@@ -1305,13 +1307,14 @@ class DerivaImagingWorker:
         OME_Companion_* columns, so without companions there is nothing to record.
         """
         if self.generate_ome_companion and channels_no > 1:
+            image_z_rows = []
             for pyramid in self.tiff_files:
                 if z_index_no <= self.z_threshold and pyramid['z'] != middle_z_index:
                     continue
-                
+
                 if pyramid['channel'] != 0:
                     continue
-                
+
                 OME_XML_URL, OME_XML_Name, OME_XML_Bytes, OME_XML_MD5 = self.getCompanionInfo(pyramid['series'], pyramid['z'], companion)
                 row = {'Image': scenes[str(pyramid['series'])],
                        'Z_Index': pyramid['z'],
@@ -1320,17 +1323,16 @@ class DerivaImagingWorker:
                        'OME_Companion_Bytes': OME_XML_Bytes,
                        'OME_Companion_MD5': OME_XML_MD5
                        }
-                image_z_rid = self.createRecord('/entity/{}:{}'.format(urlquote(self.model['image_schema']), urlquote(self.model['image_z'])), row, rid)
-                if image_z_rid == None:
-                    return 1
+                image_z_rows.append(row)
+            if image_z_rows and self.createEntities(self.model['image_z'], image_z_rows, rid) == None:
+                return 1
                 
         """
         Build now the Processed_Image records
         """
-        for pyramid in self.tiff_files:
-            if 'row' in pyramid.keys():
-                if self.createEntity('{}:{}'.format(urlquote(self.model['image_schema']), urlquote(self.model['processed_image'])), pyramid['row'], rid) == None:
-                    return 1
+        processed_image_rows = [pyramid['row'] for pyramid in self.tiff_files if 'row' in pyramid.keys()]
+        if processed_image_rows and self.createEntities(self.model['processed_image'], processed_image_rows, rid) == None:
+            return 1
                 
         if series_no == 1:
             return 0
@@ -1835,27 +1837,21 @@ class DerivaImagingWorker:
             self.sendMail('FAILURE IMAGE PROCESSING: DELETE ENTITY ERROR', 'RID: %s\n%s\n' % (rid, ''.join(traceback.format_exception(et, ev, tb))))
             return 1
 
-    def createEntity(self, path: str, row: dict[str, Any], rid: str) -> Optional[str]:
-        """Insert a row into an ERMrest table.
+    def createEntities(self, table: str, rows: list[dict[str, Any]], rid: str) -> Optional[list]:
+        """Bulk-insert rows into an image-schema table, chunked internally by deriva-extras.
 
         Args:
-            path: ERMrest path for the table (schema:table).
-            row: Dictionary containing column values.
+            table: Table name in the image schema.
+            rows: List of dictionaries containing column values.
             rid: RID of the source image for error reporting.
 
         Returns:
-            URL path on success, None on error.
+            List of inserted rows on success, None on error.
         """
         try:
-            url = '/entity/{}'.format(path)
-            resp = self.catalog.post(
-                url,
-                json=[row]
-            )
-            resp.raise_for_status()
-            
-            self.logger.debug('SUCCEEDED created in the table "%s" the entry "%s".' % (url, json.dumps(row, indent=4))) 
-            return url
+            inserted = insert_table_rows(self.catalog, self.model['image_schema'], table, rows)
+            self.logger.info('inserted %d/%d rows into %s for RID=%s' % (len(inserted), len(rows), table, rid))
+            return inserted
         except:
             et, ev, tb = sys.exc_info()
             self.logger.error('got exception "%s"' % str(ev))
